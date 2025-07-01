@@ -24,8 +24,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <NetworkProvider>
           <ChartDataProvider>
             <GlobalLogProvider>
-              <BotProvider>
-                <TokenProvider>
+              <TokenProvider>
+                <BotProvider>
                   <BotServiceProvider>
                     <BotLogicProvider>
                       <AppWalletProvider>
@@ -35,8 +35,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                        </AppWalletProvider>
                     </BotLogicProvider>
                   </BotServiceProvider>
-                </TokenProvider>
-              </BotProvider>
+                </BotProvider>
+              </TokenProvider>
             </GlobalLogProvider>
           </ChartDataProvider>
         </NetworkProvider>
