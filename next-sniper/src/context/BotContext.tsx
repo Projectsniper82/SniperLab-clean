@@ -122,8 +122,15 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
       workerRef.current.onerror = (e) => {
         append(`error: ${e.message}`);
       };
+      append('[app] Worker created');
     }
     const bots = allBotsByNetwork[network] || [];
+    if (bots.length === 0) {
+      append('[app] Warning: no bots configured');
+    }
+    if (!tokenAddress) {
+      append('[app] Warning: no token selected');
+    }
     bots.forEach((b) => {
       tradeCountsRef.current[b.id] = (tradeCountsRef.current[b.id] || 0) + 1;
     });
@@ -165,11 +172,15 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
     isLpActive,
   ]);
 
-   const startTrading = useCallback(() => {
+    const startTrading = useCallback(() => {
     setIsTradingActive(true);
+    append('[app] Trading started');
     runBotLogicRef.current?.();
   }, []);
-  const stopTrading = useCallback(() => setIsTradingActive(false), []);
+  const stopTrading = useCallback(() => {
+    setIsTradingActive(false);
+    append('[app] Trading stopped');
+  }, []);
 
   useEffect(() => {
     runBotLogicRef.current = runBotLogic;
@@ -189,11 +200,15 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
       if (workerRef.current) {
         workerRef.current.terminate();
         workerRef.current = null;
+        append('[app] Worker terminated');
       }
     }
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
-      if (workerRef.current) workerRef.current.terminate();
+      if (workerRef.current) {
+        workerRef.current.terminate();
+        append('[app] Worker terminated');
+      }
     };
   }, [isTradingActive]);
 
