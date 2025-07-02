@@ -216,7 +216,7 @@ function createTradeApi(wallet, ctx, log) {
 }
 
 self.onmessage = async (ev) => {
- const { code, bots = [], context = {} } = ev.data || {};
+ const { code, bots = [], context = {}, mode = 'per-bot' } = ev.data || {};
   try {
     // Provide window polyfill similar to walletCreator
     globalThis.window = self;
@@ -243,6 +243,8 @@ self.onmessage = async (ev) => {
       self.postMessage({ log: msg });
     };
 
+    const tradeApis = wallets.map((w) => createTradeApi(w, workerContext, log));
+
     const exports = {};
     // Execute the provided code in a function scope
     const fn = new Function('exports', 'context', code);
@@ -253,13 +255,30 @@ self.onmessage = async (ev) => {
       return;
     }
 
-    for (const wallet of wallets) {
+    if (mode === 'group') {
+      const botContexts = wallets.map((wallet, i) => ({
+        wallet,
+        publicKey: wallet.publicKey,
+        market: workerContext.market,
+        buy: tradeApis[i].buy,
+        sell: tradeApis[i].sell,
+        log: (m) => log(`[${wallet.publicKey.toBase58()}] ${m}`)
+      }));
+      const groupCtx = { ...workerContext, bots: botContexts };
       try {
-        const tradeApi = createTradeApi(wallet, workerContext, log);
-        const ctxWithApi = { ...workerContext, buy: tradeApi.buy, sell: tradeApi.sell };
-        await exports.strategy(wallet, log, ctxWithApi);
+        await exports.strategy(log, groupCtx);
       } catch (err) {
-        log(`Error executing strategy for ${wallet.publicKey.toBase58()}: ${err?.message || err}`);
+         log(`Error executing group strategy: ${err?.message || err}`);
+      }
+    } else {
+      for (let i = 0; i < wallets.length; i++) {
+        const wallet = wallets[i];
+        try {
+          const ctxWithApi = { ...workerContext, buy: tradeApis[i].buy, sell: tradeApis[i].sell };
+          await exports.strategy(wallet, log, ctxWithApi);
+        } catch (err) {
+          log(`Error executing strategy for ${wallet.publicKey.toBase58()}: ${err?.message || err}`);
+        }
       }
     }
   } catch (err) {

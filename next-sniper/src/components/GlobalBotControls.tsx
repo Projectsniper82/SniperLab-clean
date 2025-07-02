@@ -7,104 +7,84 @@ import { useBotContext } from '@/context/BotContext';
 import { UserStrategy } from '@/context/BotLogicContext';
 
 const DEFAULT_PRESET = `
-// Basic example strategy. It buys 0.01 SOL worth of a token when the
-// last observed price is below 0.5 SOL. Replace \`POOL_ID\` and token
-// mint addresses with the market you want to trade.
+/**
+ * Default Strategy (Per-Bot Mode)
+ * Runs for each bot individually. Buys 0.01 if price is under 0.5.
+ * Context:
+ * - market: { lastPrice, ... }
+ * - buy(amount, options?) – auto-routed (Jupiter on Mainnet, Raydium on Devnet)
+ * - sell(amount, options?)
+ * - log(msg)
+ */
 exports.strategy = async (wallet, log, context) => {
-  const { connection, market } = context ?? {};
-  if (!wallet?.publicKey || !connection) {
-    return log('wallet or connection unavailable');
+  if (!context.token?.address) {
+    log('no token configured');
+    return;
   }
-  if (!market || typeof market.lastPrice !== 'number') {
-    return log('price data unavailable');
+  if (context.market.lastPrice < 0.5) {
+    await context.buy(0.01);
+    log('Bought 0.01');
   }
- 
-if (market.lastPrice < 0.5) {
-    const { createWalletAdapter } = await import('@/utils/walletAdapter');
-    const { swapRaydiumTokens } = await import('@/utils/raydiumSdkAdapter');
-    const { default: BN } = await import('bn.js');
-
-    const adapter = createWalletAdapter(wallet, connection);
-    const lamports = new BN(0.01 * 1e9); // spend 0.01 SOL
-    const poolId = 'POOL_ID'; // update with your Raydium pool ID
-    const wsol = 'So11111111111111111111111111111111111111112';
-    try {
-      await swapRaydiumTokens(adapter, connection, poolId, wsol, lamports, 0.01);
-      log('buy order submitted');
-    } catch (e) {
-      log('buy failed: ' + (e?.message || e));
-    }
-  } else {
-    log('price above threshold, no trade');
-  }
-};
-// You can tweak the thresholds, amounts and pool/token addresses above
-// to implement your own custom logic.`;
+};`;
 
 const MARKET_MAKER_PRESET = `
-// Simple market making example. On each run it either buys or sells a
-// tiny amount around the current price. Adjust the pool and mint
-// addresses as well as the price spread to suit your needs.
+/**
+ * Market Maker Strategy (Per-Bot Mode)
+ * Buys below and sells above a price spread.
+ * Context:
+ * - market: { lastPrice, avgPrice }
+ * - buy/sell/log as above.
+ */
 exports.strategy = async (wallet, log, context) => {
-  const { connection, market } = context ?? {};
-  if (!wallet?.publicKey || !connection) {
-    return log('wallet or connection unavailable');
+  const spread = 0.05;
+  const { lastPrice, avgPrice = lastPrice } = context.market;
+  if (lastPrice < avgPrice * (1 - spread)) {
+    await context.buy(0.01, { slippage: 0.3 });
+    log(\`Market maker buy at \${lastPrice}\`);
+  } else if (lastPrice > avgPrice * (1 + spread)) {
+    await context.sell(0.01, { slippage: 0.3 });
+    log(\`Market maker sell at \${lastPrice}\`);
+  } else {
+    log('No trade (within spread)');
   }
-  if (!market || typeof market.lastPrice !== 'number') {
-    return log('price data unavailable');
-  }
-
-  const { createWalletAdapter } = await import('@/utils/walletAdapter');
-  const { swapRaydiumTokens } = await import('@/utils/raydiumSdkAdapter');
-  const { default: BN } = await import('bn.js');
-
-  const adapter = createWalletAdapter(wallet, connection);
-  const poolId = 'POOL_ID'; // your Raydium pool
-  const tokenMint = 'TOKEN_MINT';
-  const wsol = 'So11111111111111111111111111111111111111112';
-
-  const buyTarget = market.lastPrice * 0.95;  // 5% below market
-  const sellTarget = market.lastPrice * 1.05; // 5% above market
-
-  try {
-    if (market.lastPrice <= buyTarget) {
-      await swapRaydiumTokens(
-        adapter,
-        connection,
-        poolId,
-        wsol,
-        new BN(0.005 * 1e9),
-        0.01
-      );
-      log('market maker buy placed');
-    } else if (market.lastPrice >= sellTarget) {
-      await swapRaydiumTokens(
-        adapter,
-        connection,
-        poolId,
-        tokenMint,
-        new BN(1),
-        0.01
-      );
-      log('market maker sell placed');
-    } else {
-      log('within spread, nothing to do');
-    }
-  } catch (e) {
-    log('market maker error: ' + (e?.message || e));
-  }
-};
-// Modify the spread and trade sizes above to experiment with different
-// market making behaviours.`;
+};`;
 
 const DEFAULT_GROUP_PRESET = `
-// Group mode example. Executes once with an array of bots.
+/**
+ * Default Strategy (Group Mode)
+ * Runs once, loops through all bots, buys 0.01 if price < 0.5.
+ * Context:
+ * - bots: Array of bot contexts ({ wallet, publicKey, market, buy, sell, log })
+ * - log(msg)
+ */
 exports.strategy = async (log, context) => {
   for (const bot of context.bots) {
-    const { market } = bot;
-    if (market.lastPrice < 0.5) {
-      buy(0.01);
-      log('Group buy for bot ' + bot.publicKey.toBase58());
+    if (bot.market.lastPrice < 0.5) {
+      await bot.buy(0.01);
+      bot.log('Group buy for bot ' + bot.publicKey.toBase58());
+    }
+  }
+};`;
+
+const GROUP_MARKET_MAKER_PRESET = `
+/**
+ * Market Maker Strategy (Group Mode)
+ * Loops through all bots, buys below and sells above spread.
+ * Context:
+ * - bots: see above.
+ */
+exports.strategy = async (log, context) => {
+  const spread = 0.05;
+  for (const bot of context.bots) {
+    const { lastPrice, avgPrice = lastPrice } = bot.market;
+    if (lastPrice < avgPrice * (1 - spread)) {
+      await bot.buy(0.01, { slippage: 0.3 });
+      bot.log(\`Market maker buy at \${lastPrice}\`);
+    } else if (lastPrice > avgPrice * (1 + spread)) {
+      await bot.sell(0.01, { slippage: 0.3 });
+      bot.log(\`Market maker sell at \${lastPrice}\`);
+    } else {
+      bot.log('No trade (within spread)');
     }
   }
 };`;
@@ -147,11 +127,17 @@ export default function GlobalBotControls({
     const { append } = useGlobalLogs();
     const handleModeChange = (value: 'per-bot' | 'group') => {
         onModeChange(value);
+        const trimmed = botCode.trim();
         const isDefault =
-            botCode.trim() === DEFAULT_PRESET.trim() ||
-            botCode.trim() === DEFAULT_GROUP_PRESET.trim();
+            trimmed === DEFAULT_PRESET.trim() ||
+            trimmed === DEFAULT_GROUP_PRESET.trim();
+        const isMaker =
+            trimmed === MARKET_MAKER_PRESET.trim() ||
+            trimmed === GROUP_MARKET_MAKER_PRESET.trim();
         if (isDefault) {
             onSelectPreset(value === 'per-bot' ? DEFAULT_PRESET : DEFAULT_GROUP_PRESET);
+        } else if (isMaker) {
+            onSelectPreset(value === 'per-bot' ? MARKET_MAKER_PRESET : GROUP_MARKET_MAKER_PRESET);
         }
     };
 
@@ -234,7 +220,13 @@ export default function GlobalBotControls({
                         </button>
                         <button
                             className="px-2 py-1 text-sm bg-gray-700 rounded-md ml-2"
-                            onClick={() => onSelectPreset(MARKET_MAKER_PRESET)}
+                            onClick={() =>
+                                onSelectPreset(
+                                    executionMode === 'per-bot'
+                                        ? MARKET_MAKER_PRESET
+                                        : GROUP_MARKET_MAKER_PRESET
+                                )
+                            }
                         >
                             Market Maker Logic
                         </button>
@@ -245,7 +237,7 @@ export default function GlobalBotControls({
                             id="advanced-toggle"
                             type="checkbox"
                             checked={isAdvancedMode}
-                             onChange={(e) => handleAdvancedChange(e.target.checked)}
+                              onChange={(e) => handleAdvancedChange(e.target.checked)}
                         />
                         <label htmlFor="advanced-toggle" className="text-sm text-gray-200">Advanced Mode</label>
                         <select

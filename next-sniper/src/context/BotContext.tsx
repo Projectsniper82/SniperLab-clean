@@ -16,24 +16,40 @@ import { useToken } from './TokenContext';
 
 
 // Template used when initializing new bot code in the editor
-export const DEFAULT_BOT_CODE = `exports.strategy = async (wallet, log, context) => {
-  log('executing default strategy on ' + context.network);
+export const DEFAULT_BOT_CODE = `
+/**
+ * Default Strategy (Per-Bot Mode)
+ * Runs for each bot individually. Buys 0.01 if price is under 0.5.
+ * Context:
+ *   - market: { lastPrice, ... }
+ *   - buy(amount, options?) – auto-routed (Jupiter on Mainnet, Raydium on Devnet)
+ *   - sell(amount, options?)
+ *   - log(msg)
+ */
+exports.strategy = async (wallet, log, context) => {
   if (!context.token?.address) {
     log('no token configured');
     return;
   }
   if (context.market.lastPrice < 0.5) {
-    buy(0.01);
-    log('Bought 0.01 (platform auto-selects token/network/pool)');
+    await context.buy(0.01);
+    log('Bought 0.01');
   }
 };`;
 
-export const DEFAULT_GROUP_BOT_CODE = `exports.strategy = async (log, context) => {
+export const DEFAULT_GROUP_BOT_CODE = `
+/**
+ * Default Strategy (Group Mode)
+ * Runs once, loops through all bots, buys 0.01 if price < 0.5.
+ * Context:
+ *   - bots: Array of bot contexts ({ wallet, publicKey, market, buy, sell, log })
+ *   - log(msg)
+ */
+exports.strategy = async (log, context) => {
   for (const bot of context.bots) {
-    const { market } = bot;
-    if (market.lastPrice < 0.5) {
-      buy(0.01);
-      log('Group buy for bot ' + bot.publicKey.toBase58());
+    if (bot.market.lastPrice < 0.5) {
+      await bot.buy(0.01);
+      bot.log('Group buy for bot ' + bot.publicKey.toBase58());
     }
   }
 };`;
