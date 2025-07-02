@@ -1,0 +1,57 @@
+{
+  "compilerOptions": {
+    /* Target & module resolution */
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "node",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    /* JSX support */
+    "jsx": "preserve",
+    /* Allow importing JavaScript files */
+    "allowJs": true,
+    "checkJs": false,
+    /* Next.js recommends noEmit + isolatedModules */
+    "noEmit": true,
+    "isolatedModules": true,
+    /* Handy interop / strictness flags */
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "strict": true,
+    /* Resolve JSON imports */
+    "resolveJsonModule": true,
+    /* Base URL & path aliases */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "src/*"
+      ] // <--- CORRECTED/ADDED GENERAL ALIAS
+    },
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
+  },
+  "ts-node": {
+    "compilerOptions": {
+      "module": "commonjs",
+      "moduleResolution": "node"
+    },
+    "transpileOnly": true
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
