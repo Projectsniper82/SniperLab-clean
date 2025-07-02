@@ -36,6 +36,8 @@ export default function TradingBotsPage() {
         setAllBotsByNetwork,
         botCode,
         setBotCode,
+        executionMode,
+        setExecutionMode,
         isAdvancedMode,
         setIsAdvancedMode,
         isTradingActive,
@@ -303,6 +305,8 @@ export default function TradingBotsPage() {
                         botCode={botCode}
                         setBotCode={setBotCode}
                         onSelectPreset={handleSelectPreset}
+                        executionMode={executionMode}
+                        onModeChange={setExecutionMode}
                         isAdvancedMode={isAdvancedMode}
                         onToggleAdvancedMode={handleToggleAdvancedMode}
                         userStrategies={userStrategies}

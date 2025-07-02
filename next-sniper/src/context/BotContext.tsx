@@ -16,14 +16,26 @@ import { useToken } from './TokenContext';
 
 
 // Template used when initializing new bot code in the editor
-const DEFAULT_BOT_CODE = `exports.strategy = async (wallet, log, ctx) => {
-  log('executing default strategy on ' + ctx.rpcUrl);
-  if (!ctx.tokenAddress) {
+export const DEFAULT_BOT_CODE = `exports.strategy = async (wallet, log, context) => {
+  log('executing default strategy on ' + context.network);
+  if (!context.token?.address) {
     log('no token configured');
     return;
   }
-  log('wallet ' + wallet.publicKey.toBase58() + ' ready for token ' + ctx.tokenAddress);
-  // Add trading actions here. Wallet is already wrapped with a wallet adapter
+  if (context.market.lastPrice < 0.5) {
+    buy(0.01);
+    log('Bought 0.01 (platform auto-selects token/network/pool)');
+  }
+};`;
+
+export const DEFAULT_GROUP_BOT_CODE = `exports.strategy = async (log, context) => {
+  for (const bot of context.bots) {
+    const { market } = bot;
+    if (market.lastPrice < 0.5) {
+      buy(0.01);
+      log('Group buy for bot ' + bot.publicKey.toBase58());
+    }
+  }
 };`;
 
 export interface BotInstance {
@@ -41,6 +53,8 @@ interface BotContextState {
   setAllBotsByNetwork: React.Dispatch<React.SetStateAction<BotsByNetwork>>;
   botCode: string;
   setBotCode: React.Dispatch<React.SetStateAction<string>>;
+  executionMode: 'per-bot' | 'group';
+  setExecutionMode: React.Dispatch<React.SetStateAction<'per-bot' | 'group'>>;
   isAdvancedMode: boolean;
   setIsAdvancedMode: React.Dispatch<React.SetStateAction<boolean>>;
   isTradingActive: boolean;
@@ -62,6 +76,7 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
     useChartData();
   const { tokenAddress, isLpActive } = useToken();
   const [botCode, setBotCode] = useState(DEFAULT_BOT_CODE);
+  const [executionMode, setExecutionMode] = useState<'per-bot' | 'group'>('per-bot');
   const [isAdvancedMode, setIsAdvancedMode] = useState(false);
   const [isTradingActive, setIsTradingActive] = useState(false);
   const tradeCountsRef = useRef<Record<string, number>>({});
@@ -117,6 +132,7 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
       code: botCode,
       bots: bots.map((b) => b.secret),
       context,
+      mode: executionMode,
     });
   }, [
     allBotsByNetwork,
@@ -128,6 +144,7 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
     currentLpValue,
     solUsdPrice,
     isAdvancedMode,
+    executionMode,
     tokenAddress,
     isLpActive,
   ]);
@@ -169,6 +186,8 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
     setAllBotsByNetwork,
     botCode,
     setBotCode,
+    executionMode,
+    setExecutionMode,
     isAdvancedMode,
     setIsAdvancedMode,
     isTradingActive,

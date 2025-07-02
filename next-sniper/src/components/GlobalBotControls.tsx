@@ -97,6 +97,17 @@ exports.strategy = async (wallet, log, context) => {
 // Modify the spread and trade sizes above to experiment with different
 // market making behaviours.`;
 
+const DEFAULT_GROUP_PRESET = `
+// Group mode example. Executes once with an array of bots.
+exports.strategy = async (log, context) => {
+  for (const bot of context.bots) {
+    const { market } = bot;
+    if (market.lastPrice < 0.5) {
+      buy(0.01);
+      log('Group buy for bot ' + bot.publicKey.toBase58());
+    }
+  }
+};`;
 
 // Define the props for the component
 interface GlobalBotControlsProps {
@@ -105,6 +116,8 @@ interface GlobalBotControlsProps {
     botCode: string;
     setBotCode: (code: string) => void;
     onSelectPreset: (preset: string) => void;
+    executionMode: 'per-bot' | 'group';
+    onModeChange: (mode: 'per-bot' | 'group') => void;
     isAdvancedMode: boolean;
     onToggleAdvancedMode: (checked: boolean) => void;
     userStrategies: UserStrategy[];
@@ -119,6 +132,8 @@ export default function GlobalBotControls({
     botCode,
     setBotCode,
     onSelectPreset,
+    executionMode,
+    onModeChange,
     isAdvancedMode,
     onToggleAdvancedMode,
     userStrategies,
@@ -130,6 +145,15 @@ export default function GlobalBotControls({
     const [showAdvancedModal, setShowAdvancedModal] = useState(false);
     const { startTrading, stopTrading, getSystemState } = useBotContext();
     const { append } = useGlobalLogs();
+    const handleModeChange = (value: 'per-bot' | 'group') => {
+        onModeChange(value);
+        const isDefault =
+            botCode.trim() === DEFAULT_PRESET.trim() ||
+            botCode.trim() === DEFAULT_GROUP_PRESET.trim();
+        if (isDefault) {
+            onSelectPreset(value === 'per-bot' ? DEFAULT_PRESET : DEFAULT_GROUP_PRESET);
+        }
+    };
 
     const handleToggle = (checked: boolean) => {
         onToggleLogic(checked);
@@ -204,7 +228,7 @@ export default function GlobalBotControls({
                         <h4 className="font-semibold text-gray-200 mb-1">Presets</h4>
                         <button
                             className="px-2 py-1 text-sm bg-gray-700 rounded-md"
-                            onClick={() => onSelectPreset(DEFAULT_PRESET)}
+                            onClick={() => onSelectPreset(executionMode === 'per-bot' ? DEFAULT_PRESET : DEFAULT_GROUP_PRESET)}
                         >
                             Use Default Template
                         </button>
@@ -224,6 +248,14 @@ export default function GlobalBotControls({
                              onChange={(e) => handleAdvancedChange(e.target.checked)}
                         />
                         <label htmlFor="advanced-toggle" className="text-sm text-gray-200">Advanced Mode</label>
+                        <select
+                            className="ml-4 bg-gray-700 text-white text-xs rounded"
+                            value={executionMode}
+                            onChange={(e) => handleModeChange(e.target.value as 'per-bot' | 'group')}
+                        >
+                            <option value="per-bot">Per-Bot Mode</option>
+                            <option value="group">Group Mode</option>
+                        </select>
                     </div>
                     {isAdvancedMode && (
                         <p className="text-xs text-red-400">
