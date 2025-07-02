@@ -2,6 +2,7 @@ import { Buffer } from './libs/buffer.js';
 
 const bnPromise = import('https://cdn.jsdelivr.net/npm/bn.js@5.2.2/+esm');
 const splPromise = import('https://cdn.jsdelivr.net/npm/@solana/spl-token@0.4.13/+esm');
+const raydiumPromise = import('https://cdn.jsdelivr.net/npm/@raydium-io/raydium-sdk-v2@0.1.138-alpha/+esm');
 
 
 function createWalletAdapter(web3, wallet) {
@@ -77,45 +78,136 @@ async function executeJupiterSwap({ wallet, connection, inputMint, outputMint, a
   return sig;
 }
 
+async function executeRaydiumSwap({ wallet, connection, inputMint, outputMint, amount, slippageBps = 50 }) {
+  const web3 = await web3Promise;
+  const raydium = await raydiumPromise;
+  const { Raydium, PublicKey, TxVersion } = raydium;
+
+  const sdk = await Raydium.load({
+    connection,
+    owner: wallet.publicKey,
+    cluster: 'devnet',
+    disableFeatureCheck: true,
+  });
+
+  const pools = await sdk.api.fetchPoolByMints({
+    mint1: inputMint.toBase58(),
+    mint2: outputMint.toBase58(),
+  });
+  const poolId = pools?.data?.[0]?.id;
+  if (!poolId) throw new Error('Pool not found');
+
+  const swapParams = {
+    inputMint,
+    outputMint,
+    amount: typeof amount === 'object' ? amount.toNumber() : amount,
+    swapMode: 'ExactIn',
+    slippageBps,
+    owner: wallet.publicKey,
+    connection,
+    poolId: new PublicKey(poolId),
+    txVersion: 'V0',
+    unwrapSol: true,
+  };
+
+  const { transaction, signers } = await sdk.swap(swapParams);
+  if (signers && signers.length) transaction.sign(signers);
+  const signed = await wallet.signTransaction(transaction);
+  const sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 5 });
+  const latest = await connection.getLatestBlockhashAndContext('confirmed');
+  await connection.confirmTransaction({ signature: sig, blockhash: latest.value.blockhash, lastValidBlockHeight: latest.value.lastValidBlockHeight }, 'confirmed');
+  return sig;
+}
+
 function createTradeApi(wallet, ctx, log) {
+   // This function automatically routes devnet trades through Raydium and mainnet through Jupiter. User strategies do not need to know or specify which is used.
+  const retrySwap = async (fn, isDevnet) => {
+    let attempt = 0;
+    let lastErr;
+    let delayMs = isDevnet ? 2000 : 500;
+    while (attempt < 3) {
+      try {
+        return await fn();
+      } catch (e) {
+        lastErr = e;
+        log(`swap attempt ${attempt + 1} failed: ${e.message}`);
+        if (e.message && e.message.toLowerCase().includes('amount') && e.message.toLowerCase().includes('too low')) {
+          if (fn.amountBn && fn.amountBn.gtn(1)) {
+            fn.amountBn = fn.amountBn.divn(2);
+            log('decreasing amount and retrying');
+          } else {
+            break;
+          }
+        }
+        await new Promise(res => setTimeout(res, delayMs));
+        delayMs *= 2;
+      }
+      attempt++;
+    }
+    throw lastErr;
+  };
+
   return {
     buy: async (amount, opts = {}) => {
       const BN = (await bnPromise).default;
       const { NATIVE_MINT } = await splPromise;
       const decimals = ctx.token?.decimals || 0;
-      const amountBn = new BN(Math.round(amount * 10 ** decimals));
+      let amountBn = new BN(Math.round(amount * 10 ** decimals));
+      const slippageBps = opts.slippageBps || 50;
       if (ctx.network.startsWith('mainnet')) {
-        return executeJupiterSwap({
+        log('Using Jupiter helper for buy');
+        return retrySwap(() => executeJupiterSwap({
           wallet,
           connection: ctx.connection,
           inputMint: NATIVE_MINT,
           outputMint: new ctx.web3.PublicKey(ctx.token.address),
           amount: amountBn,
-          slippageBps: opts.slippageBps || 50,
+          slippageBps,
           priorityFeeMicroLamports: opts.priorityFeeMicroLamports || 1000
-        });
+       }), false);
       } else {
-        log('Devnet buy not implemented');
-        return null;
+        log('Using Raydium helper for buy');
+        const fn = () => executeRaydiumSwap({
+          wallet,
+          connection: ctx.connection,
+          inputMint: NATIVE_MINT,
+          outputMint: new ctx.web3.PublicKey(ctx.token.address),
+          amount: amountBn,
+          slippageBps
+        });
+        fn.amountBn = amountBn;
+        return retrySwap(fn, true);
       }
     },
     sell: async (amount, opts = {}) => {
       const BN = (await bnPromise).default;
       const { NATIVE_MINT } = await splPromise;
       const decimals = ctx.token?.decimals || 0;
-      const amountBn = new BN(Math.round(amount * 10 ** decimals));
+      let amountBn = new BN(Math.round(amount * 10 ** decimals));
+      const slippageBps = opts.slippageBps || 50;
       if (ctx.network.startsWith('mainnet')) {
-        return executeJupiterSwap({
+       log('Using Jupiter helper for sell');
+        return retrySwap(() => executeJupiterSwap({
           wallet,
           connection: ctx.connection,
           inputMint: new ctx.web3.PublicKey(ctx.token.address),
           outputMint: NATIVE_MINT,
           amount: amountBn,
-          slippageBps: opts.slippageBps || 50,
+          slippageBps,
           priorityFeeMicroLamports: opts.priorityFeeMicroLamports || 1000
-        });
+         }), false);
       } else {
-        log('Devnet sell not implemented');
+        log('Using Raydium helper for sell');
+        const fn = () => executeRaydiumSwap({
+          wallet,
+          connection: ctx.connection,
+          inputMint: new ctx.web3.PublicKey(ctx.token.address),
+          outputMint: NATIVE_MINT,
+          amount: amountBn,
+          slippageBps
+        });
+        fn.amountBn = amountBn;
+        return retrySwap(fn, true);
         return null;
       }
     }

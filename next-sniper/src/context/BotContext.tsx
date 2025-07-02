@@ -100,7 +100,7 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
     const context: any = {
       rpcUrl,
       network,
-      tokenAddress,
+       token: { address: tokenAddress },
       isLpActive,
       market: {
         lastPrice,
