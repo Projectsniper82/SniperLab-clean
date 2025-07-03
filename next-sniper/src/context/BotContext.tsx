@@ -110,10 +110,8 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
 
   const runBotLogic = useCallback(() => {
     if (!workerRef.current) {
-      workerRef.current = new Worker(
-        new URL('../../public/workers/bot-worker.js', import.meta.url),
-        { type: 'module' }
-      );
+      // Use the worker directly from the public folder to avoid Turbopack issues
+      workerRef.current = new Worker('/workers/bot-worker.js', { type: 'module' });
       workerRef.current.onmessage = (ev) => {
         const { log, error } = ev.data || {};
         if (log) append(log);

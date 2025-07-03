@@ -96,6 +96,9 @@ export function loadBotWallets(network: NetworkType): Keypair[] {
         const wallets = encryptedWallets.map(arr => {
             const decrypted = arr.map((byte, idx) => byte ^ password.charCodeAt(idx % password.length));
             const secretKey = new Uint8Array(decrypted);
+            if (secretKey.length !== 64) {
+                throw new Error('Invalid wallet data.');
+            }
             return Keypair.fromSecretKey(secretKey);
         });
         console.log(`[BotWalletManager] Loaded ${wallets.length} bot wallet(s) for ${network}.`);
@@ -103,7 +106,7 @@ export function loadBotWallets(network: NetworkType): Keypair[] {
     } catch (error) {
         console.error(`[BotWalletManager] Failed to load wallets for ${network}:`, error);
         resetEncryptionPassword();
-        throw new Error('Failed to load bot wallets. Please re-enter the correct password.');
+        throw new Error('Incorrect password or corrupted wallet data.');
     }
 }
 

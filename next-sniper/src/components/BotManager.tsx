@@ -41,21 +41,34 @@ export default function BotManager({ selectedTokenAddress, isLpActive, bots }: B
 
     useEffect(() => {
         setIsLoading(true);
-        const loaded = loadBotWallets(network);
-        setBotWallets(loaded);
-        // sync loaded wallets with global context
-        setAllBotsByNetwork(prev => ({
-            ...prev,
-             [network]: loaded.map(w => ({ id: w.publicKey.toBase58(), secret: Array.from(w.secretKey) }))
-        }));
-        setIsLoading(false);
-        registerReloader(() => {
-            const refreshed = loadBotWallets(network);
-            setBotWallets(refreshed);
+        try {
+            const loaded = loadBotWallets(network);
+            setBotWallets(loaded);
+            // sync loaded wallets with global context
             setAllBotsByNetwork(prev => ({
                 ...prev,
-                [network]: refreshed.map(w => ({ id: w.publicKey.toBase58(), secret: Array.from(w.secretKey) }))
+                 [network]: loaded.map(w => ({ id: w.publicKey.toBase58(), secret: Array.from(w.secretKey) }))
             }));
+           } catch (error: any) {
+            console.error(error);
+            alert(error?.message || 'Failed to load bot wallets.');
+            // keep existing wallets/state on error so user can retry with correct password
+        } finally {
+            setIsLoading(false);
+        }
+
+        registerReloader(() => {
+            try {
+                const refreshed = loadBotWallets(network);
+                setBotWallets(refreshed);
+                setAllBotsByNetwork(prev => ({
+                    ...prev,
+                    [network]: refreshed.map(w => ({ id: w.publicKey.toBase58(), secret: Array.from(w.secretKey) }))
+                }));
+            } catch (error: any) {
+                console.error(error);
+                alert(error?.message || 'Failed to load bot wallets.');
+            } 
         });
     }, [network, registerReloader, setAllBotsByNetwork]);
 
