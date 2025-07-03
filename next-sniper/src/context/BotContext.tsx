@@ -112,7 +112,7 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
     if (!workerRef.current) {
       // Load the worker via a static URL so Turbopack can bundle it
       workerRef.current = new Worker(
-        new URL('../workers/bot-worker.ts', import.meta.url),
+        new URL('../workers/bot-worker.js', import.meta.url),
         { type: 'module' }
       );
       workerRef.current.onmessage = (ev) => {

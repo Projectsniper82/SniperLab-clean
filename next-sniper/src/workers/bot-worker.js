@@ -5,7 +5,7 @@ import { Raydium } from '@raydium-io/raydium-sdk-v2';
 import { NATIVE_MINT } from '@solana/spl-token';
 import * as web3 from '@solana/web3.js';
 
-(globalThis as any).Buffer = (globalThis as any).Buffer || Buffer;
+globalThis.Buffer = globalThis.Buffer || Buffer;
 
 function createWalletAdapter(web3, wallet) {
   let kp = null;
