@@ -9,7 +9,3 @@ declare global {
 // worker. The actual runtime script is fetched from jsDelivr, but we map its
 // types to the locally installed @solana/web3.js package so that compilation
 // succeeds without `cannot find module` errors.
-
-declare module './workers/libs/buffer.js' {
-  export const Buffer: typeof import('buffer').Buffer;
-}

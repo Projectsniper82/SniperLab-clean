@@ -1,10 +1,11 @@
 
-import { Buffer } from './libs/buffer.js';
+import { Buffer } from 'buffer';
+import BN from 'bn.js';
+import { Raydium } from '@raydium-io/raydium-sdk-v2';
+import { NATIVE_MINT } from '@solana/spl-token';
+import * as web3 from '@solana/web3.js';
 
-const bnPromise = import('https://cdn.jsdelivr.net/npm/bn.js@5.2.2/+esm');
-const splPromise = import('https://cdn.jsdelivr.net/npm/@solana/spl-token@0.4.13/+esm');
-const raydiumPromise = import('https://cdn.jsdelivr.net/npm/@raydium-io/raydium-sdk-v2@0.1.138-alpha/+esm');
-
+(globalThis as any).Buffer = (globalThis as any).Buffer || Buffer;
 
 function createWalletAdapter(web3, wallet) {
   let kp = null;
@@ -44,14 +45,7 @@ function createWalletAdapter(web3, wallet) {
   return { publicKey: pk, signTransaction: signTx, signAllTransactions: signAll, get connected() { return true; } };
 }
 
-
-// Load web3 once and reuse the promise across messages
-const web3Promise = import(
-  'https://cdn.jsdelivr.net/npm/@solana/web3.js@1.98.2/lib/index.browser.esm.js'
-);
-
 async function executeJupiterSwap({ wallet, connection, inputMint, outputMint, amount, slippageBps = 50, priorityFeeMicroLamports = 1000 }) {
-  const web3 = await web3Promise;
   const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${inputMint.toBase58()}&outputMint=${outputMint.toBase58()}&amount=${amount.toString()}&slippageBps=${slippageBps}`;
   const quoteResponse = await (await fetch(quoteUrl)).json();
   if (!quoteResponse || quoteResponse.error) {
@@ -80,10 +74,6 @@ async function executeJupiterSwap({ wallet, connection, inputMint, outputMint, a
 }
 
 async function executeRaydiumSwap({ wallet, connection, inputMint, outputMint, amount, slippageBps = 50 }) {
-  const web3 = await web3Promise;
-  const raydium = await raydiumPromise;
-  const { Raydium, PublicKey, TxVersion } = raydium;
-
   const sdk = await Raydium.load({
     connection,
     owner: wallet.publicKey,
@@ -106,7 +96,7 @@ async function executeRaydiumSwap({ wallet, connection, inputMint, outputMint, a
     slippageBps,
     owner: wallet.publicKey,
     connection,
-    poolId: new PublicKey(poolId),
+    poolId: new web3.PublicKey(poolId),
     txVersion: 'V0',
     unwrapSol: true,
   };
@@ -151,8 +141,6 @@ function createTradeApi(wallet, ctx, log) {
   return {
     buy: async (amount, opts = {}) => {
       log(`[trade] Attempting buy: amount=${amount}, opts=${JSON.stringify(opts)}`);
-      const BN = (await bnPromise).default;
-      const { NATIVE_MINT } = await splPromise;
       const decimals = ctx.token?.decimals || 0;
       let amountBn = new BN(Math.round(amount * 10 ** decimals));
       const slippageBps = opts.slippageBps || 50;
@@ -192,8 +180,6 @@ function createTradeApi(wallet, ctx, log) {
     },
     sell: async (amount, opts = {}) => {
       log(`[trade] Attempting sell: amount=${amount}, opts=${JSON.stringify(opts)}`);
-      const BN = (await bnPromise).default;
-      const { NATIVE_MINT } = await splPromise;
       const decimals = ctx.token?.decimals || 0;
       let amountBn = new BN(Math.round(amount * 10 ** decimals));
       const slippageBps = opts.slippageBps || 50;
@@ -243,7 +229,6 @@ self.onmessage = async (ev) => {
     if (!globalThis.Buffer) {
       globalThis.Buffer = Buffer;
     }
-    const web3 = await web3Promise;
         const { rpcUrl, network, isAdvancedMode, systemState, token, market, ...restContext } = context;
     const connection = new web3.Connection(rpcUrl, 'confirmed');
     const detectedNetwork = network || (rpcUrl.includes('mainnet') ? 'mainnet-beta' : 'devnet');
