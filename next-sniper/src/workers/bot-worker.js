@@ -270,9 +270,22 @@ self.onmessage = async (ev) => {
     const tradeApis = wallets.map((w) => createTradeApi(w, workerContext, log));
 
     const exports = {};
-    // Execute the provided code in a function scope
-    const fn = new Function('exports', 'context', code);
-    fn(exports, workerContext);
+   let fn;
+    try {
+      // Compile the strategy code first so syntax errors are reported clearly
+      fn = new Function('exports', 'context', code);
+    } catch (compileErr) {
+      log(`[worker] Failed to compile strategy: ${compileErr?.message || compileErr}`);
+      self.postMessage({ error: compileErr?.message || String(compileErr) });
+      return;
+    }
+    try {
+      fn(exports, workerContext);
+    } catch (execErr) {
+      log(`[worker] Error during strategy initialization: ${execErr?.message || execErr}`);
+      self.postMessage({ error: execErr?.message || String(execErr) });
+      return;
+    }
 
     log(`[worker] Preparing to run strategy (${mode}), bots=${wallets.length}`);
 
@@ -316,8 +329,12 @@ self.onmessage = async (ev) => {
       }
     }
   } catch (err) {
-    self.postMessage({ log: `[worker] Unhandled error: ${err.message || err}` });
-    self.postMessage({ error: err.message || String(err) });
+    const msg = err?.message || err;
+    self.postMessage({ log: `[worker] Unhandled error: ${msg}` });
+    if (err?.stack) {
+      self.postMessage({ log: err.stack });
+    }
+    self.postMessage({ error: msg || String(err) });
   }
 };
 
