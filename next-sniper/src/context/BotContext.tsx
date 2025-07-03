@@ -172,10 +172,9 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
     isLpActive,
   ]);
 
-    const startTrading = useCallback(() => {
+  const startTrading = useCallback(() => {
     setIsTradingActive(true);
     append('[app] Trading started');
-    runBotLogicRef.current?.();
   }, []);
   const stopTrading = useCallback(() => {
     setIsTradingActive(false);
