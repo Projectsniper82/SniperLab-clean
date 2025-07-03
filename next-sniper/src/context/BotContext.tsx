@@ -13,6 +13,7 @@ import type { NetworkType } from './NetworkContext';
 import { useNetwork } from './NetworkContext';
 import { useChartData } from './ChartDataContext';
 import { useToken } from './TokenContext';
+import { Buffer } from 'buffer';
 
 
 // Template used when initializing new bot code in the editor
@@ -56,7 +57,11 @@ exports.strategy = async (log, context) => {
 
 export interface BotInstance {
   id: string;
-  secret: number[];
+  /**
+   * Secret key bytes for the wallet. This must be exactly 64 bytes so the
+   * worker can reconstruct a Keypair instance.
+   */
+  secretKey: number[];
 }
 
 // Map each network to its associated trading bots. The keys must exactly match
@@ -126,6 +131,7 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
       append('[app] Worker created');
     }
     const bots = allBotsByNetwork[network] || [];
+    const botSecrets = bots.map((b) => b.secret);
     if (bots.length === 0) {
       append('[app] Warning: no bots configured');
     }
@@ -151,10 +157,17 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
     };
     if (isAdvancedMode) {
       context.systemState = systemState;
+      const botSecrets = bots.map((b) =>
+      b.secretKey instanceof Uint8Array ? b.secretKey : Uint8Array.from(b.secretKey)
+    );
+    append(`[app] Launching worker with ${botSecrets.length} bot(s)`);
+    append(
+      JSON.stringify(botSecrets.map((s) => Buffer.from(s).toString('base64')))
+    );
     }
     workerRef.current.postMessage({
       code: botCode,
-      bots: bots.map((b) => b.secret),
+      bots: botSecrets,
       context,
       mode: executionMode,
     });
