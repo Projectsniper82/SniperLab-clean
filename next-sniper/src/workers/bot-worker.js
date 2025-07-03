@@ -73,19 +73,27 @@ async function executeJupiterSwap({ wallet, connection, inputMint, outputMint, a
   return sig;
 }
 
-async function executeRaydiumSwap({ wallet, connection, inputMint, outputMint, amount, slippageBps = 50 }) {
+async function executeRaydiumSwap({ wallet, connection, inputMint, outputMint, amount, slippageBps = 50, cluster = 'devnet', log = () => {}, poolOverride }) {
+  log(`[raydium] init swap: cluster=${cluster}, endpoint=${connection.rpcEndpoint}`);
+  log(`[raydium] input=${inputMint.toBase58()} output=${outputMint.toBase58()}`);
   const sdk = await Raydium.load({
     connection,
     owner: wallet.publicKey,
-    cluster: 'devnet',
+    cluster,
     disableFeatureCheck: true,
   });
 
-  const pools = await sdk.api.fetchPoolByMints({
-    mint1: inputMint.toBase58(),
-    mint2: outputMint.toBase58(),
-  });
-  const poolId = pools?.data?.[0]?.id;
+   let poolId = poolOverride;
+  if (!poolId) {
+    const pools = await sdk.api.fetchPoolByMints({
+      mint1: inputMint.toBase58(),
+      mint2: outputMint.toBase58(),
+    });
+    log(`[raydium] fetched ${pools?.data?.length || 0} pools`);
+    poolId = pools?.data?.[0]?.id;
+  } else {
+    log(`[raydium] using provided pool override ${poolId}`);
+  }
   if (!poolId) throw new Error('Pool not found');
 
   const swapParams = {
@@ -141,6 +149,8 @@ function createTradeApi(wallet, ctx, log) {
   return {
     buy: async (amount, opts = {}) => {
       log(`[trade] Attempting buy: amount=${amount}, opts=${JSON.stringify(opts)}`);
+      log(`[trade] network=${ctx.network} rpc=${ctx.rpcUrl}`);
+      log(`[trade] token=${ctx.token?.address}`);
       const decimals = ctx.token?.decimals || 0;
       let amountBn = new BN(Math.round(amount * 10 ** decimals));
       const slippageBps = opts.slippageBps || 50;
@@ -166,7 +176,10 @@ function createTradeApi(wallet, ctx, log) {
             inputMint: NATIVE_MINT,
             outputMint: new ctx.web3.PublicKey(ctx.token.address),
             amount: amountBn,
-            slippageBps
+            slippageBps,
+            cluster: ctx.network.startsWith('mainnet') ? 'mainnet' : 'devnet',
+            log,
+            poolOverride: opts.poolId
           });
           fn.amountBn = amountBn;
           const result = await retrySwap(fn, true);
@@ -180,6 +193,8 @@ function createTradeApi(wallet, ctx, log) {
     },
     sell: async (amount, opts = {}) => {
       log(`[trade] Attempting sell: amount=${amount}, opts=${JSON.stringify(opts)}`);
+      log(`[trade] network=${ctx.network} rpc=${ctx.rpcUrl}`);
+      log(`[trade] token=${ctx.token?.address}`);
       const decimals = ctx.token?.decimals || 0;
       let amountBn = new BN(Math.round(amount * 10 ** decimals));
       const slippageBps = opts.slippageBps || 50;
@@ -193,6 +208,9 @@ function createTradeApi(wallet, ctx, log) {
             outputMint: NATIVE_MINT,
             amount: amountBn,
             slippageBps,
+            cluster: ctx.network.startsWith('mainnet') ? 'mainnet' : 'devnet',
+            log,
+            poolOverride: opts.poolId,
             priorityFeeMicroLamports: opts.priorityFeeMicroLamports || 1000
           }), false);
           log('[trade] Sell succeeded, result=' + JSON.stringify(result));
