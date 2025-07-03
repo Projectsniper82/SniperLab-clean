@@ -69,18 +69,18 @@ const DEFAULT_GROUP_PRESET = `
  * - log(msg)
  */
 exports.strategy = async (log, context) => {
-log('[strategy] Group strategy running. Bots: ' + context.bots.length);
+  log('[strategy] Group strategy running. Bots: ' + context.bots.length);
   for (const bot of context.bots) {
-  log(`[strategy] Bot ${bot.publicKey.toBase58()} market.lastPrice=${bot.market.lastPrice}`);
+    log('[strategy] Bot ' + bot.publicKey.toBase58() + ' market.lastPrice=' + bot.market.lastPrice);
     if (bot.market.lastPrice < 0.5) {
-    log(`[strategy] Bot ${bot.publicKey.toBase58()} is about to BUY`);
+      log('[strategy] Bot ' + bot.publicKey.toBase58() + ' is about to BUY');
       await bot.buy(0.01);
       bot.log('Group buy for bot ' + bot.publicKey.toBase58());
-       } else {
+    } else {
       bot.log('No buy: price >= 0.5');
     }
   }
-    log('[strategy] Group default strategy complete');
+  log('[strategy] Group default strategy complete');
 };`;
 
 const GROUP_MARKET_MAKER_PRESET = `
@@ -90,27 +90,28 @@ const GROUP_MARKET_MAKER_PRESET = `
  * Context:
  * - bots: see above.
  */
-
 exports.strategy = async (log, context) => {
- log('[strategy] Group market maker strategy running');
+  log('[strategy] Group market maker strategy running');
   const spread = 0.05;
   for (const bot of context.bots) {
-    const { lastPrice, avgPrice = lastPrice } = bot.market;
-    log(`[strategy] Bot ${bot.publicKey.toBase58()} lastPrice=${lastPrice}`);
+    const lastPrice = bot.market.lastPrice;
+    const avgPrice = bot.market.avgPrice || lastPrice;
+    log('[strategy] Bot ' + bot.publicKey.toBase58() + ' lastPrice=' + lastPrice);
     if (lastPrice < avgPrice * (1 - spread)) {
-    log(`[strategy] Bot ${bot.publicKey.toBase58()} maker BUY`);
+      log('[strategy] Bot ' + bot.publicKey.toBase58() + ' maker BUY');
       await bot.buy(0.01, { slippage: 0.3 });
-      bot.log(`Market maker buy at ${lastPrice}`);
+      bot.log('Market maker buy at ' + lastPrice);
     } else if (lastPrice > avgPrice * (1 + spread)) {
-      log(`[strategy] Bot ${bot.publicKey.toBase58()} maker SELL`);
+      log('[strategy] Bot ' + bot.publicKey.toBase58() + ' maker SELL');
       await bot.sell(0.01, { slippage: 0.3 });
-      bot.log(`Market maker sell at ${lastPrice}`);
+      bot.log('Market maker sell at ' + lastPrice);
     } else {
       bot.log('No trade (within spread)');
     }
   }
-log('[strategy] Group market maker strategy complete');
-};`
+  log('[strategy] Group market maker strategy complete');
+};`;
+
 
 // Define the props for the component
 interface GlobalBotControlsProps {
