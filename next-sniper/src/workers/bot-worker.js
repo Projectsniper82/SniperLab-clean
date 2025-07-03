@@ -95,11 +95,12 @@ self.onmessage = async (ev) => {
       self.postMessage({ log: '[worker] Warning: no token configured in context' });
     }
     
-    const wallets = bots.map((sk) => {
+    const wallets = bots.map((sk, i) => {
       try {
         const kp = web3.Keypair.fromSecretKey(Uint8Array.from(sk));
-        return createWalletAdapter(web3, kp);
-      } catch (_) {
+       return createWalletAdapter(kp, connection);
+      } catch (err) {
+        self.postMessage({ log: `[worker] Failed to load bot ${i}: ${err?.message || err}` });
         return null;
       }
     }).filter(Boolean);
@@ -128,7 +129,7 @@ self.onmessage = async (ev) => {
       return;
     }
 
-    log(`[worker] Preparing to run strategy (${mode}), bots=${wallets.length}`);
+    log(`[worker] Preparing to run strategy (${mode}), wallets=${wallets.length}`);
 
     if (typeof exports.strategy !== 'function') {
       log('[worker] No strategy function exported');

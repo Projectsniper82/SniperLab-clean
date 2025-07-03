@@ -47,9 +47,10 @@ export default function BotManager({ selectedTokenAddress, isLpActive, bots }: B
             // sync loaded wallets with global context
             setAllBotsByNetwork(prev => ({
                 ...prev,
-                 [network]: loaded.map(w => ({ id: w.publicKey.toBase58(), secret: Array.from(w.secretKey) }))
+                [network]: loaded.map(w => ({ id: w.publicKey.toBase58(), secretKey: Array.from(w.secretKey) }))
+
             }));
-           } catch (error: any) {
+        } catch (error: any) {
             console.error(error);
             alert(error?.message || 'Failed to load bot wallets.');
             // keep existing wallets/state on error so user can retry with correct password
@@ -63,7 +64,7 @@ export default function BotManager({ selectedTokenAddress, isLpActive, bots }: B
                 setBotWallets(refreshed);
                 setAllBotsByNetwork(prev => ({
                     ...prev,
-                    [network]: refreshed.map(w => ({ id: w.publicKey.toBase58(), secret: Array.from(w.secretKey) }))
+                    [network]: refreshed.map(w => ({ id: w.publicKey.toBase58(), secretKey: Array.from(w.secretKey) }))
                 }));
             } catch (error: any) {
                 console.error(error);
@@ -85,7 +86,7 @@ export default function BotManager({ selectedTokenAddress, isLpActive, bots }: B
             // update global bot list
          setAllBotsByNetwork(prev => ({
                 ...prev,
-                [network]: [...prev[network], { id: newWallet.publicKey.toBase58(), secret: Array.from(newWallet.secretKey) }]
+                 [network]: [...prev[network], { id: newWallet.publicKey.toBase58(), secretKey: Array.from(newWallet.secretKey) }]
             }));
         } catch (error: any) {
             alert(error?.message || 'Failed to save bot wallets.');
@@ -214,7 +215,7 @@ export default function BotManager({ selectedTokenAddress, isLpActive, bots }: B
                     <div className='space-x-2 mb-2'>
                         <button onClick={() => setAllBotsByNetwork(prev => ({
                                 ...prev,
-                                 [network]: [...prev[network], { id: crypto.randomUUID(), secret: [] }]
+                                 [network]: [...prev[network], { id: crypto.randomUUID(), secretKey: [] }]
                             }))}
                             className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded">
                             Add Bot
