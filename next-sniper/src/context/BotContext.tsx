@@ -131,7 +131,9 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
       append('[app] Worker created');
     }
     const bots = allBotsByNetwork[network] || [];
-    const botSecrets = bots.map((b) => b.secret);
+    const botSecrets = bots.map((b) =>
+      b.secretKey instanceof Uint8Array ? b.secretKey : Uint8Array.from(b.secretKey)
+    );
     if (bots.length === 0) {
       append('[app] Warning: no bots configured');
     }
@@ -157,13 +159,10 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
     };
     if (isAdvancedMode) {
       context.systemState = systemState;
-      const botSecrets = bots.map((b) =>
-      b.secretKey instanceof Uint8Array ? b.secretKey : Uint8Array.from(b.secretKey)
-    );
-    append(`[app] Launching worker with ${botSecrets.length} bot(s)`);
-    append(
-      JSON.stringify(botSecrets.map((s) => Buffer.from(s).toString('base64')))
-    );
+ append(`[app] Launching worker with ${botSecrets.length} bot(s)`);
+      append(
+        JSON.stringify(botSecrets.map((s) => Buffer.from(s).toString('base64')))
+      );
     }
     workerRef.current.postMessage({
       code: botCode,
