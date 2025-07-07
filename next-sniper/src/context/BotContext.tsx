@@ -15,6 +15,7 @@ import { useChartData } from './ChartDataContext';
 import { useToken } from './TokenContext';
 import { Buffer } from 'buffer';
 import { getSimulatedPool } from '../utils/simulatedPoolStore';
+import { calculateMinTradeAmount } from '../utils/minTradeAmount';
 
 // Template used when initializing new bot code in the editor
 export const DEFAULT_BOT_CODE = `
@@ -82,6 +83,8 @@ interface BotContextState {
   setIsTradingActive: React.Dispatch<React.SetStateAction<boolean>>;
   startTrading: () => void;
   stopTrading: () => void;
+  minTradeAmount: number | null;
+  setMinTradeAmount: React.Dispatch<React.SetStateAction<number | null>>;
   getSystemState: () => { allBots: BotInstance[]; tradeCounts: Record<string, number> };
 }
 
@@ -100,11 +103,24 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
   const [executionMode, setExecutionMode] = useState<'per-bot' | 'group'>('per-bot');
   const [isAdvancedMode, setIsAdvancedMode] = useState(false);
   const [isTradingActive, setIsTradingActive] = useState(false);
+  const [minTradeAmount, setMinTradeAmount] = useState<number | null>(null);
   const tradeCountsRef = useRef<Record<string, number>>({});
   const workerRef = useRef<Worker | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const runBotLogicRef = useRef<(() => void) | null>(null);
   const { append } = useGlobalLogs();
+
+  const lastLpValueRef = useRef<number>(0);
+
+  const updateMinTrade = useCallback(() => {
+    const amount = calculateMinTradeAmount(tokenAddress, network);
+    setMinTradeAmount(amount);
+    if (amount !== null) {
+      append(`[app] minTradeAmount updated: ${amount} SOL`);
+    } else {
+      append('[app] minTradeAmount unavailable');
+    }
+  }, [tokenAddress, network, append]);
 
   const getSystemState = useCallback(() => {
     return {
@@ -196,9 +212,10 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
   ]);
 
   const startTrading = useCallback(() => {
+    updateMinTrade();
     setIsTradingActive(true);
     append('[app] Trading started');
-  }, []);
+ }, [updateMinTrade, append]);
   const stopTrading = useCallback(() => {
     setIsTradingActive(false);
     append('[app] Trading stopped');
@@ -207,6 +224,27 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     runBotLogicRef.current = runBotLogic;
   }, [runBotLogic]);
+
+  useEffect(() => {
+    updateMinTrade();
+  }, [tokenAddress, network, updateMinTrade]);
+
+  useEffect(() => {
+    if (network !== 'devnet') {
+      setMinTradeAmount(null);
+      return;
+    }
+    if (lastLpValueRef.current === 0) {
+      lastLpValueRef.current = currentLpValue;
+      return;
+    }
+    const diff = Math.abs(currentLpValue - lastLpValueRef.current) / lastLpValueRef.current;
+    if (diff >= 0.04) {
+      lastLpValueRef.current = currentLpValue;
+      updateMinTrade();
+    }
+  }, [currentLpValue, network, updateMinTrade]);
+
 
   useEffect(() => {
     if (isTradingActive) {
@@ -247,6 +285,8 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
     setIsTradingActive,
     startTrading,
     stopTrading,
+    minTradeAmount,
+    setMinTradeAmount,
     getSystemState,
   };
 
