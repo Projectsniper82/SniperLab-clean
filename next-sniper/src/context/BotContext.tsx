@@ -14,7 +14,7 @@ import { useNetwork } from './NetworkContext';
 import { useChartData } from './ChartDataContext';
 import { useToken } from './TokenContext';
 import { Buffer } from 'buffer';
-
+import { getSimulatedPool } from '../utils/simulatedPoolStore';
 
 // Template used when initializing new bot code in the editor
 export const DEFAULT_BOT_CODE = `
@@ -147,7 +147,7 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
     const context: any = {
       rpcUrl,
       network,
-       token: { address: tokenAddress },
+      token: { address: tokenAddress },
       isLpActive,
       market: {
         lastPrice,
@@ -157,6 +157,16 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
       },
       isAdvancedMode,
     };
+
+   if (network === 'devnet') {
+      const pool = getSimulatedPool();
+      if (pool) {
+        context.poolId = pool.raydiumPoolId || pool.id;
+        if (pool.tokenDecimals !== undefined) {
+          context.token.decimals = pool.tokenDecimals;
+        }
+      }
+    } 
     if (isAdvancedMode) {
       context.systemState = systemState;
  append(`[app] Launching worker with ${botSecrets.length} bot(s)`);

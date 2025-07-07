@@ -31,14 +31,15 @@ function createTradeApi(wallet, ctx, log) {
           priorityFeeMicroLamports: opts.priorityFeeMicroLamports || 1000
         });
       }
-      if (!opts.poolId) {
+      const poolId = opts.poolId || ctx.poolId;
+      if (!poolId) {
         log('[trade] Missing poolId for Raydium buy');
         throw new Error('poolId required');
       }
       return swapRaydiumTokens(
         wallet,
         ctx.connection,
-        opts.poolId,
+        poolId,
         NATIVE_MINT.toBase58(),
         amountBn,
         slippageBps / 10000
@@ -60,14 +61,15 @@ function createTradeApi(wallet, ctx, log) {
           priorityFeeMicroLamports: opts.priorityFeeMicroLamports || 1000
         });
       }
-      if (!opts.poolId) {
+     const poolId = opts.poolId || ctx.poolId;
+      if (!poolId) {
         log('[trade] Missing poolId for Raydium sell');
         throw new Error('poolId required');
       }
       return swapRaydiumTokens(
         wallet,
         ctx.connection,
-        opts.poolId,
+        poolId,
         ctx.token.address,
         amountBn,
         slippageBps / 10000
