@@ -19,6 +19,8 @@ import { calculateMinTradeAmount } from '../utils/minTradeAmount';
 
 // Template used when initializing new bot code in the editor
 export const DEFAULT_BOT_CODE = `
+// On devnet, context.minTradeAmount is the minimum allowed trade size for the selected token/pool.
+// Use this value for all trades; you can randomize or override it in your logic.
 /**
  * Default Strategy (Per-Bot Mode)
  * Runs for each bot individually. Buys 0.01 if price is under 0.5.
@@ -40,6 +42,8 @@ exports.strategy = async (wallet, log, context) => {
 };`;
 
 export const DEFAULT_GROUP_BOT_CODE = `
+// On devnet, context.minTradeAmount is the minimum allowed trade size for the selected token/pool.
+// Use this value for all trades; you can randomize or override it in your logic.
 /**
  * Default Strategy (Group Mode)
  * Runs once, loops through all bots, buys 0.01 if price < 0.5.
@@ -172,6 +176,7 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
         solUsdPrice,
       },
       isAdvancedMode,
+      minTradeAmount,
     };
 
    if (network === 'devnet') {
@@ -209,6 +214,7 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
     executionMode,
     tokenAddress,
     isLpActive,
+     minTradeAmount,
   ]);
 
   const startTrading = useCallback(() => {

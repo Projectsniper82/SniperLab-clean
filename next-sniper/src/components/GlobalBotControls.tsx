@@ -7,6 +7,8 @@ import { useBotContext } from '@/context/BotContext';
 import { UserStrategy } from '@/context/BotLogicContext';
 
 const DEFAULT_PRESET = `
+// On devnet, context.minTradeAmount is the minimum allowed trade size for the selected token/pool.
+// Use this value for all trades; you can randomize or override it in your logic.
 /**
  * Default Strategy (Per-Bot Mode)
  * Runs for each bot individually. Buys 0.01 if price is under 0.5.
@@ -34,6 +36,8 @@ log('[strategy] Default per-bot strategy start for ' + wallet.publicKey.toBase58
 };`;
 
 const MARKET_MAKER_PRESET = `
+// On devnet, context.minTradeAmount is the minimum allowed trade size for the selected token/pool.
+// Use this value for all trades; you can randomize or override it in your logic.
 /**
  * Market Maker Strategy (Per-Bot Mode)
  * Buys below and sells above a price spread.
@@ -61,6 +65,8 @@ log('[strategy] Market maker per-bot strategy start for ' + wallet.publicKey.toB
 };`;
 
 const DEFAULT_GROUP_PRESET = `
+// On devnet, context.minTradeAmount is the minimum allowed trade size for the selected token/pool.
+// Use this value for all trades; you can randomize or override it in your logic.
 /**
  * Default Strategy (Group Mode)
  * Runs once, loops through all bots, buys 0.01 if price < 0.5.
@@ -84,6 +90,8 @@ exports.strategy = async (log, context) => {
 };`;
 
 const GROUP_MARKET_MAKER_PRESET = `
+// On devnet, context.minTradeAmount is the minimum allowed trade size for the selected token/pool.
+// Use this value for all trades; you can randomize or override it in your logic.
 /**
  * Market Maker Strategy (Group Mode)
  * Loops through all bots, buys below and sells above spread.
