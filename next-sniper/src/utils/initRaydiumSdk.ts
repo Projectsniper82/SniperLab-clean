@@ -17,7 +17,7 @@ export async function initRaydiumSdkForUser(
         connection: userConnection,
         owner: ownerPublicKey, // Use the connected user's public key as the owner context
         cluster: 'mainnet',    // Assuming mainnet, adjust if network can vary
-        disableLoadToken: false, // Defaults, adjust if needed
+        disableLoadToken: true, // Avoid loading token list from network
         disableFeatureCheck: true, // Defaults, adjust if needed
     });
 

@@ -189,6 +189,7 @@ export const initRaydiumSdk = async (wallet, connection, currentNetwork) => {
             connection,
             cluster: cluster,
             programIdConfig: programIdConfig,
+            disableLoadToken: true, // prevent network fetch for token list
             disableFeatureCheck: true
         });
 

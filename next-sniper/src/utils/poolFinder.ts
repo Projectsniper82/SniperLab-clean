@@ -56,7 +56,7 @@ export async function fetchRaydiumPoolsFromSDK(
       connection,
       cluster: clusterString,
       owner,
-      disableLoadToken: false,
+     disableLoadToken: true, // skip token list fetch to avoid network errors
       disableFeatureCheck: false,
     });
   } catch (sdkLoadError: any) {
