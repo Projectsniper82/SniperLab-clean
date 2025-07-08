@@ -1,5 +1,5 @@
 'use client';
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { getAssociatedTokenAddress } from '@solana/spl-token';
 import { NetworkType } from './NetworkContext';
@@ -33,7 +33,11 @@ const WalletBalanceContext = createContext<WalletBalanceCtx | undefined>(undefin
 export const WalletBalanceProvider = ({ children }: { children: React.ReactNode }) => {
   const [balances, setBalances] = useState<Record<string, BalanceInfo>>({});
 
-  const fetchTokenBalance = async (connection: Connection, wallet: PublicKey, mint: string) => {
+   const fetchTokenBalance = useCallback(async (
+    connection: Connection,
+    wallet: PublicKey,
+    mint: string,
+  ) => {
     try {
       if (!mint) return 0;
       const ata = await getAssociatedTokenAddress(new PublicKey(mint), wallet);
@@ -42,9 +46,9 @@ export const WalletBalanceProvider = ({ children }: { children: React.ReactNode 
     } catch {
       return 0;
     }
-  };
+   }, []);
 
-  const refreshBalance = async (
+ const refreshBalance = useCallback(async (
     network: NetworkType,
     connection: Connection,
     wallet: PublicKey,
@@ -56,9 +60,9 @@ export const WalletBalanceProvider = ({ children }: { children: React.ReactNode 
     const info: BalanceInfo = { sol, token, tradeCount: 0 };
     setBalances((prev) => ({ ...prev, [wallet.toBase58()]: info }));
     return info;
-  };
+  }, [fetchTokenBalance]);
 
-  const updateAfterTrade = async (
+  const updateAfterTrade = useCallback(async (
     network: NetworkType,
     connection: Connection,
     wallet: PublicKey,
@@ -83,10 +87,15 @@ export const WalletBalanceProvider = ({ children }: { children: React.ReactNode 
     if (network === 'mainnet-beta' || tradeCount % 5 === 0) {
       await refreshBalance(network, connection, wallet, tokenMint);
     }
-  };
+  }, [refreshBalance]);
+
+  const contextValue = useMemo(
+    () => ({ balances, refreshBalance, updateAfterTrade }),
+    [balances, refreshBalance, updateAfterTrade],
+  );
 
   return (
-    <WalletBalanceContext.Provider value={{ balances, refreshBalance, updateAfterTrade }}>
+   <WalletBalanceContext.Provider value={contextValue}>
       {children}
     </WalletBalanceContext.Provider>
   );
