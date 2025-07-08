@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useRef } from 'react';
+import React, { createContext, useContext, useRef, useCallback, useMemo } from 'react';
 
 interface BotWalletReloadCtx {
   reloadWallets: () => void;
@@ -12,16 +12,18 @@ const BotWalletReloadContext = createContext<BotWalletReloadCtx | undefined>(und
 export const BotWalletReloadProvider = ({ children }: { children: React.ReactNode }) => {
   const reloadRef = useRef<() => void>(() => {});
 
-  const registerReloader = (fn: () => void) => {
+  const registerReloader = useCallback((fn: () => void) => {
     reloadRef.current = fn;
-  };
+ }, []);
 
-  const reloadWallets = () => {
+  const reloadWallets = useCallback(() => {
     reloadRef.current();
-  };
+  }, []);
+
+  const value = useMemo(() => ({ reloadWallets, registerReloader }), [reloadWallets, registerReloader]);
 
   return (
-    <BotWalletReloadContext.Provider value={{ reloadWallets, registerReloader }}>
+    <BotWalletReloadContext.Provider value={value}>
       {children}
     </BotWalletReloadContext.Provider>
   );
