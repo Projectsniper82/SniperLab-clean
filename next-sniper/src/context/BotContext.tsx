@@ -146,17 +146,27 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
 
   const updateMinTrade = useCallback(() => {
      if (!tokenAddress) {
-      setMinTradeAmount(null);
-      append('[app] No token selected. Minimum trade amount is not available.');
+      setMinTradeAmount((prev) => {
+        if (prev !== null) {
+          append('[app] No token selected. Minimum trade amount is not available.');
+          return null;
+        }
+        return prev;
+      });
       return;
     }
     const amount = calculateMinTradeAmount(tokenAddress, network);
-    setMinTradeAmount(amount);
-    if (amount !== null) {
-      append(`[app] minTradeAmount updated: ${amount} SOL`);
-    } else {
-      append('[app] minTradeAmount unavailable');
-    }
+    setMinTradeAmount((prev) => {
+      if (prev !== amount) {
+        if (amount !== null) {
+          append(`[app] minTradeAmount updated: ${amount} SOL`);
+        } else {
+          append('[app] minTradeAmount unavailable');
+        }
+        return amount;
+      }
+      return prev;
+    });
   }, [tokenAddress, network, append]);
 
   const getSystemState = useCallback(() => {
@@ -270,13 +280,20 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     if (network !== 'devnet') {
-      setMinTradeAmount(null);
+     setMinTradeAmount((prev) => (prev !== null ? null : prev));
+      lastLpValueRef.current = 0;
       return;
     }
+
+    if (!currentLpValue || currentLpValue === lastLpValueRef.current) {
+      return;
+    }
+
     if (lastLpValueRef.current === 0) {
       lastLpValueRef.current = currentLpValue;
       return;
     }
+    
     const diff = Math.abs(currentLpValue - lastLpValueRef.current) / lastLpValueRef.current;
     if (diff >= 0.04) {
       lastLpValueRef.current = currentLpValue;
