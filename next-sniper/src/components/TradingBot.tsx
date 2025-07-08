@@ -3,7 +3,7 @@
 import { useNetwork } from '@/context/NetworkContext';
 import { LAMPORTS_PER_SOL, PublicKey, Keypair, SystemProgram, TransactionMessage } from '@solana/web3.js';
 import { getAssociatedTokenAddress, getAccount, NATIVE_MINT } from '@solana/spl-token';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import BN from 'bn.js';
 import Decimal from 'decimal.js';
 import { executeJupiterSwap } from '@/utils/jupiterSwapUtil';
@@ -95,13 +95,16 @@ export default function TradingBot({
         log(botPublicKeyString, message);
     }, [log, botPublicKeyString]);
 
+    const refreshingRef = useRef(false);
+
     const refreshBotBalances = useCallback(async () => {
-        if (isRefreshing) return;
+         if (refreshingRef.current) return;
+        refreshingRef.current = true;
         setIsRefreshing(true);
         addLog('Refreshing bot balances...');
         try {
             const botPublicKey = new PublicKey(botPublicKeyString);
-const info = await refreshBalance(network, connection, botPublicKey, tokenMintAddress);
+            const info = await refreshBalance(network, connection, botPublicKey, tokenMintAddress);
             setSolBalance(info.sol);
             setTokenBalance(info.token);
             addLog(`Balances: ${info.sol.toFixed(4)} SOL, ${info.token.toFixed(4)} Tokens`);
@@ -109,9 +112,10 @@ const info = await refreshBalance(network, connection, botPublicKey, tokenMintAd
             console.error('Failed to refresh bot balances:', error);
             addLog('Error refreshing balances.');
         } finally {
+            refreshingRef.current = false;
             setIsRefreshing(false);
         }
-     }, [connection, botPublicKeyString, addLog, tokenMintAddress, network, refreshBalance, isRefreshing]);
+    }, [connection, botPublicKeyString, addLog, tokenMintAddress, network, refreshBalance]);
 
     useEffect(() => {
         refreshBotBalances();
