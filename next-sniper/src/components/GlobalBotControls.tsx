@@ -7,11 +7,15 @@ import { useBotContext } from '@/context/BotContext';
 import { UserStrategy } from '@/context/BotLogicContext';
 
 const DEFAULT_PRESET = `
-// On devnet, context.minTradeAmount is the minimum allowed trade size for the selected token/pool.
-// Use this value for all trades; you can randomize or override it in your logic.
+// On devnet, context.minTradeAmount is set automatically by the app
+// and is always the minimum viable trade amount for the current token/pool.
+// Preset code always uses this value directly, and does not include any randomness.
+// You may copy this code and add your own randomization or logic in your own strategies.
+// Smart users may randomize or modify minTradeAmount for their custom logic. See documentation for advanced usage.
 /**
  * Default Strategy (Per-Bot Mode)
- * Runs for each bot individually. Buys 0.01 if price is under 0.5.
+ * Runs for each bot individually. Buys minTradeAmount on devnet
+ * or 0.01 on mainnet if price is under 0.5.
  * Context:
  * - market: { lastPrice, ... }
  * - buy(amount, options?) – auto-routed (Jupiter on Mainnet, Raydium on Devnet)
@@ -27,17 +31,30 @@ log('[strategy] Default per-bot strategy start for ' + wallet.publicKey.toBase58
   }
   if (context.market.lastPrice < 0.5) {
   log('[strategy] Buying token');
-    await context.buy(0.01);
-    log('Bought 0.01');
-     } else {
+    if (context.network === 'devnet') {
+      if (typeof context.minTradeAmount !== 'number') {
+        log('Cannot trade: minTradeAmount not set');
+        return;
+      }
+      log('Using min trade amount: ' + context.minTradeAmount);
+      await context.buy(context.minTradeAmount);
+      log('Bought min trade amount');
+    } else {
+      await context.buy(0.01);
+      log('Bought 0.01 (mainnet)');
+    }
+      } else {
     log('No buy: price >= 0.5');
   }
     log('[strategy] Default per-bot strategy complete');
 };`;
 
 const MARKET_MAKER_PRESET = `
-// On devnet, context.minTradeAmount is the minimum allowed trade size for the selected token/pool.
-// Use this value for all trades; you can randomize or override it in your logic.
+// On devnet, context.minTradeAmount is set automatically by the app
+// and is always the minimum viable trade amount for the current token/pool.
+// Preset code always uses this value directly, and does not include any randomness.
+// You may copy this code and add your own randomization or logic in your own strategies.
+// Smart users may randomize or modify minTradeAmount for their custom logic. See documentation for advanced usage.
 /**
  * Market Maker Strategy (Per-Bot Mode)
  * Buys below and sells above a price spread.
@@ -52,12 +69,30 @@ log('[strategy] Market maker per-bot strategy start for ' + wallet.publicKey.toB
   const { lastPrice, avgPrice = lastPrice } = context.market;
   if (lastPrice < avgPrice * (1 - spread)) {
   log('[strategy] Maker buy');
-    await context.buy(0.01, { slippage: 0.3 });
-    log(\`Market maker buy at \${lastPrice}\`);
+    if (context.network === 'devnet') {
+      if (typeof context.minTradeAmount !== 'number') {
+        log('Cannot trade: minTradeAmount not set');
+        return;
+      }
+      await context.buy(context.minTradeAmount, { slippage: 0.3 });
+      log(\`Market maker buy at \${lastPrice}\`);
+    } else {
+      await context.buy(0.01, { slippage: 0.3 });
+      log(\`Market maker buy at \${lastPrice}\`);
+    }
   } else if (lastPrice > avgPrice * (1 + spread)) {
    log('[strategy] Maker sell');
-    await context.sell(0.01, { slippage: 0.3 });
-    log(\`Market maker sell at \${lastPrice}\`);
+    if (context.network === 'devnet') {
+      if (typeof context.minTradeAmount !== 'number') {
+        log('Cannot trade: minTradeAmount not set');
+        return;
+      }
+      await context.sell(context.minTradeAmount, { slippage: 0.3 });
+      log(\`Market maker sell at \${lastPrice}\`);
+    } else {
+      await context.sell(0.01, { slippage: 0.3 });
+      log(\`Market maker sell at \${lastPrice}\`);
+    }
   } else {
     log('No trade (within spread)');
   }
@@ -65,11 +100,15 @@ log('[strategy] Market maker per-bot strategy start for ' + wallet.publicKey.toB
 };`;
 
 const DEFAULT_GROUP_PRESET = `
-// On devnet, context.minTradeAmount is the minimum allowed trade size for the selected token/pool.
-// Use this value for all trades; you can randomize or override it in your logic.
+// On devnet, context.minTradeAmount is set automatically by the app
+// and is always the minimum viable trade amount for the current token/pool.
+// Preset code always uses this value directly, and does not include any randomness.
+// You may copy this code and add your own randomization or logic in your own strategies.
+// Smart users may randomize or modify minTradeAmount for their custom logic. See documentation for advanced usage.
 /**
  * Default Strategy (Group Mode)
- * Runs once, loops through all bots, buys 0.01 if price < 0.5.
+ * Runs once, loops through all bots, buys minTradeAmount on devnet
+ * or 0.01 on mainnet if price < 0.5.
  * Context:
  * - bots: Array of bot contexts ({ wallet, publicKey, market, buy, sell, log })
  * - log(msg)
@@ -80,8 +119,17 @@ exports.strategy = async (log, context) => {
     log('[strategy] Bot ' + bot.publicKey.toBase58() + ' market.lastPrice=' + bot.market.lastPrice);
     if (bot.market.lastPrice < 0.5) {
       log('[strategy] Bot ' + bot.publicKey.toBase58() + ' is about to BUY');
-      await bot.buy(0.01);
-      bot.log('Group buy for bot ' + bot.publicKey.toBase58());
+      if (context.network === 'devnet') {
+        if (typeof context.minTradeAmount !== 'number') {
+          log('Cannot trade: minTradeAmount not set');
+          return;
+        }
+        await bot.buy(context.minTradeAmount);
+        bot.log('Group buy for bot ' + bot.publicKey.toBase58());
+      } else {
+        await bot.buy(0.01);
+        bot.log('Group buy for bot ' + bot.publicKey.toBase58());
+      }
     } else {
       bot.log('No buy: price >= 0.5');
     }
@@ -90,8 +138,11 @@ exports.strategy = async (log, context) => {
 };`;
 
 const GROUP_MARKET_MAKER_PRESET = `
-// On devnet, context.minTradeAmount is the minimum allowed trade size for the selected token/pool.
-// Use this value for all trades; you can randomize or override it in your logic.
+// On devnet, context.minTradeAmount is set automatically by the app
+// and is always the minimum viable trade amount for the current token/pool.
+// Preset code always uses this value directly, and does not include any randomness.
+// You may copy this code and add your own randomization or logic in your own strategies.
+// Smart users may randomize or modify minTradeAmount for their custom logic. See documentation for advanced usage.
 /**
  * Market Maker Strategy (Group Mode)
  * Loops through all bots, buys below and sells above spread.
@@ -107,12 +158,30 @@ exports.strategy = async (log, context) => {
     log('[strategy] Bot ' + bot.publicKey.toBase58() + ' lastPrice=' + lastPrice);
     if (lastPrice < avgPrice * (1 - spread)) {
       log('[strategy] Bot ' + bot.publicKey.toBase58() + ' maker BUY');
-      await bot.buy(0.01, { slippage: 0.3 });
-      bot.log('Market maker buy at ' + lastPrice);
+      if (context.network === 'devnet') {
+        if (typeof context.minTradeAmount !== 'number') {
+          log('Cannot trade: minTradeAmount not set');
+          return;
+        }
+        await bot.buy(context.minTradeAmount, { slippage: 0.3 });
+        bot.log('Market maker buy at ' + lastPrice);
+      } else {
+        await bot.buy(0.01, { slippage: 0.3 });
+        bot.log('Market maker buy at ' + lastPrice);
+      }
     } else if (lastPrice > avgPrice * (1 + spread)) {
       log('[strategy] Bot ' + bot.publicKey.toBase58() + ' maker SELL');
-      await bot.sell(0.01, { slippage: 0.3 });
-      bot.log('Market maker sell at ' + lastPrice);
+      if (context.network === 'devnet') {
+        if (typeof context.minTradeAmount !== 'number') {
+          log('Cannot trade: minTradeAmount not set');
+          return;
+        }
+        await bot.sell(context.minTradeAmount, { slippage: 0.3 });
+        bot.log('Market maker sell at ' + lastPrice);
+      } else {
+        await bot.sell(0.01, { slippage: 0.3 });
+        bot.log('Market maker sell at ' + lastPrice);
+      }
     } else {
       bot.log('No trade (within spread)');
     }

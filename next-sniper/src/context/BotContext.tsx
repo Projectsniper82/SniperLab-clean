@@ -19,11 +19,15 @@ import { calculateMinTradeAmount } from '../utils/minTradeAmount';
 
 // Template used when initializing new bot code in the editor
 export const DEFAULT_BOT_CODE = `
-// On devnet, context.minTradeAmount is the minimum allowed trade size for the selected token/pool.
-// Use this value for all trades; you can randomize or override it in your logic.
+// On devnet, context.minTradeAmount is set automatically by the app
+// and is always the minimum viable trade amount for the current token/pool.
+// Preset code always uses this value directly, and does not include any randomness.
+// You may copy this code and add your own randomization or logic in your own strategies.
+// Smart users may randomize or modify minTradeAmount for their custom logic. See documentation for advanced usage.
 /**
  * Default Strategy (Per-Bot Mode)
- * Runs for each bot individually. Buys 0.01 if price is under 0.5.
+ * Runs for each bot individually. Buys minTradeAmount on devnet
+ * or 0.01 on mainnet if price is under 0.5.
  * Context:
  *   - market: { lastPrice, ... }
  *   - buy(amount, options?) – auto-routed (Jupiter on Mainnet, Raydium on Devnet)
@@ -36,17 +40,31 @@ exports.strategy = async (wallet, log, context) => {
     return;
   }
   if (context.market.lastPrice < 0.5) {
-    await context.buy(0.01);
-    log('Bought 0.01');
+   if (context.network === 'devnet') {
+      if (typeof context.minTradeAmount !== 'number') {
+        log('Cannot trade: minTradeAmount not set');
+        return;
+      }
+      log('Using min trade amount: ' + context.minTradeAmount);
+      await context.buy(context.minTradeAmount);
+      log('Bought min trade amount');
+    } else {
+      await context.buy(0.01);
+      log('Bought 0.01 (mainnet)');
+    }
   }
 };`;
 
 export const DEFAULT_GROUP_BOT_CODE = `
-// On devnet, context.minTradeAmount is the minimum allowed trade size for the selected token/pool.
-// Use this value for all trades; you can randomize or override it in your logic.
+// On devnet, context.minTradeAmount is set automatically by the app
+// and is always the minimum viable trade amount for the current token/pool.
+// Preset code always uses this value directly, and does not include any randomness.
+// You may copy this code and add your own randomization or logic in your own strategies.
+// Smart users may randomize or modify minTradeAmount for their custom logic. See documentation for advanced usage.
 /**
  * Default Strategy (Group Mode)
- * Runs once, loops through all bots, buys 0.01 if price < 0.5.
+ * Runs once, loops through all bots, buys minTradeAmount on devnet
+ * or 0.01 on mainnet if price < 0.5.
  * Context:
  *   - bots: Array of bot contexts ({ wallet, publicKey, market, buy, sell, log })
  *   - log(msg)
@@ -54,8 +72,18 @@ export const DEFAULT_GROUP_BOT_CODE = `
 exports.strategy = async (log, context) => {
   for (const bot of context.bots) {
     if (bot.market.lastPrice < 0.5) {
-      await bot.buy(0.01);
+      if (context.network === 'devnet') {
+      if (typeof context.minTradeAmount !== 'number') {
+        log('Cannot trade: minTradeAmount not set');
+        return;
+      }
+      log('Using min trade amount: ' + context.minTradeAmount);
+      await bot.buy(context.minTradeAmount);
       bot.log('Group buy for bot ' + bot.publicKey.toBase58());
+      } else {
+        await bot.buy(0.01);
+        bot.log('Group buy for bot ' + bot.publicKey.toBase58() + ' (0.01 mainnet)');
+      }
     }
   }
 };`;
