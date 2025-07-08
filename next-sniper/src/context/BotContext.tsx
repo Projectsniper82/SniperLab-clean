@@ -145,6 +145,11 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
   const lastLpValueRef = useRef<number>(0);
 
   const updateMinTrade = useCallback(() => {
+     if (!tokenAddress) {
+      setMinTradeAmount(null);
+      append('[app] No token selected. Minimum trade amount is not available.');
+      return;
+    }
     const amount = calculateMinTradeAmount(tokenAddress, network);
     setMinTradeAmount(amount);
     if (amount !== null) {
