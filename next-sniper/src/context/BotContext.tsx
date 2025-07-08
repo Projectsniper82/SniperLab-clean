@@ -172,6 +172,7 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
   const [executionMode, setExecutionMode] = useState<'per-bot' | 'group'>('per-bot');
   const [isAdvancedMode, setIsAdvancedMode] = useState(false);
   const [isTradingActive, setIsTradingActive] = useState(false);
+  const isTradingActiveRef = useRef(isTradingActive);
   const [minTradeAmount, setMinTradeAmount] = useState<number | null>(null);
   const defaultInterval: TradeIntervalConfig = { mode: 'fixed', fixed: 5, min: 1, max: 2 };
   const loadInterval = (net: NetworkType): TradeIntervalConfig => {
@@ -343,10 +344,12 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
 
   const startTrading = useCallback(() => {
     updateMinTrade();
+     isTradingActiveRef.current = true;
     setIsTradingActive(true);
     append('[app] Trading started');
- }, [updateMinTrade, append]);
+  }, [updateMinTrade, append]);
   const stopTrading = useCallback(() => {
+     isTradingActiveRef.current = false;
     setIsTradingActive(false);
     append('[app] Trading stopped');
   }, []);
@@ -354,6 +357,10 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     runBotLogicRef.current = runBotLogic;
   }, [runBotLogic]);
+
+   useEffect(() => {
+    isTradingActiveRef.current = isTradingActive;
+  }, [isTradingActive]);
 
   useEffect(() => {
     updateMinTrade();
@@ -392,7 +399,7 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
   }, [currentLpValue, network, updateMinTrade]);
 
   const scheduleNext = useCallback(() => {
-    if (!isTradingActive) return;
+    if (!isTradingActiveRef.current) return;
     const cfg = tradeIntervalRef.current;
     const delaySec =
       cfg.mode === 'fixed'
@@ -400,19 +407,21 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
         : cfg.min + Math.random() * (cfg.max - cfg.min);
     const delayMs = delaySec * 1000;
     intervalRef.current = setTimeout(() => {
+      if (!isTradingActiveRef.current) return;
       runBotLogicRef.current?.();
       scheduleNext();
     }, delayMs);
-   }, [isTradingActive]);
+    }, []);
+
 
   useEffect(() => {
     tradeIntervalRef.current = tradeIntervalConfig;
-    if (!isTradingActive) return;
+    if (!isTradingActiveRef.current) return;
     if (intervalRef.current) {
       clearTimeout(intervalRef.current);
     }
     scheduleNext();
-  }, [tradeIntervalConfig, isTradingActive, scheduleNext]);
+   }, [tradeIntervalConfig, scheduleNext]);
 
 
   useEffect(() => {
