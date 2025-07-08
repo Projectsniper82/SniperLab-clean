@@ -193,6 +193,7 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
   });
 
   const tradeIntervalConfig = tradeIntervalsByNetwork[network];
+  const tradeIntervalRef = useRef<TradeIntervalConfig>(tradeIntervalConfig);
   const setTradeIntervalConfig = useCallback(
     (cfg: TradeIntervalConfig) => {
       setTradeIntervalsByNetwork((prev) => {
@@ -392,16 +393,26 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
 
   const scheduleNext = useCallback(() => {
     if (!isTradingActive) return;
-    const cfg = tradeIntervalConfig;
-    const delaySec = cfg.mode === 'fixed'
-      ? cfg.fixed
-      : cfg.min + Math.random() * (cfg.max - cfg.min);
+    const cfg = tradeIntervalRef.current;
+    const delaySec =
+      cfg.mode === 'fixed'
+        ? cfg.fixed
+        : cfg.min + Math.random() * (cfg.max - cfg.min);
     const delayMs = delaySec * 1000;
     intervalRef.current = setTimeout(() => {
       runBotLogicRef.current?.();
       scheduleNext();
     }, delayMs);
-  }, [isTradingActive, tradeIntervalConfig]);
+   }, [isTradingActive]);
+
+  useEffect(() => {
+    tradeIntervalRef.current = tradeIntervalConfig;
+    if (!isTradingActive) return;
+    if (intervalRef.current) {
+      clearTimeout(intervalRef.current);
+    }
+    scheduleNext();
+  }, [tradeIntervalConfig, isTradingActive, scheduleNext]);
 
 
   useEffect(() => {
