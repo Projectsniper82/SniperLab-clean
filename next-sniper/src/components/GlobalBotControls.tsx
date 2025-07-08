@@ -224,7 +224,19 @@ export default function GlobalBotControls({
 }: GlobalBotControlsProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const [showAdvancedModal, setShowAdvancedModal] = useState(false);
-    const { startTrading, stopTrading, getSystemState } = useBotContext();
+    const { startTrading, stopTrading, getSystemState, tradeIntervalConfig, setTradeIntervalConfig, isTradingActive } = useBotContext();
+    const [intervalMode, setIntervalMode] = useState<'fixed' | 'random'>(tradeIntervalConfig.mode);
+    const [fixedValue, setFixedValue] = useState(tradeIntervalConfig.fixed.toString());
+    const [minValue, setMinValue] = useState(tradeIntervalConfig.min.toString());
+    const [maxValue, setMaxValue] = useState(tradeIntervalConfig.max.toString());
+    const [intervalError, setIntervalError] = useState('');
+
+    React.useEffect(() => {
+        setIntervalMode(tradeIntervalConfig.mode);
+        setFixedValue(tradeIntervalConfig.fixed.toString());
+        setMinValue(tradeIntervalConfig.min.toString());
+        setMaxValue(tradeIntervalConfig.max.toString());
+    }, [tradeIntervalConfig]);
     const { append } = useGlobalLogs();
     const handleModeChange = (value: 'per-bot' | 'group') => {
         onModeChange(value);
@@ -253,6 +265,50 @@ export default function GlobalBotControls({
         } else {
             onToggleAdvancedMode(false);
         }
+    };
+
+    const handleIntervalModeChange = (mode: 'fixed' | 'random') => {
+        setIntervalMode(mode);
+        const f = parseInt(fixedValue);
+        const min = parseInt(minValue);
+        const max = parseInt(maxValue);
+        applyIntervalUpdate(mode, f, min, max);
+    };
+
+    const handleFixedInput = (val: string) => {
+        setFixedValue(val);
+        const num = parseInt(val);
+        applyIntervalUpdate('fixed', num, parseInt(minValue), parseInt(maxValue));
+    };
+
+    const handleMinInput = (val: string) => {
+        setMinValue(val);
+        applyIntervalUpdate('random', parseInt(fixedValue), parseInt(val), parseInt(maxValue));
+    };
+
+    const handleMaxInput = (val: string) => {
+        setMaxValue(val);
+        applyIntervalUpdate('random', parseInt(fixedValue), parseInt(minValue), parseInt(val));
+    };
+
+    const applyIntervalUpdate = (mode: 'fixed' | 'random', fixed: number, min: number, max: number) => {
+        if (mode === 'fixed') {
+            if (fixed < 1 || fixed > 300 || isNaN(fixed)) {
+                setIntervalError('Interval must be 1-300 seconds');
+                stopTrading();
+                return;
+            }
+            setIntervalError('');
+            setTradeIntervalConfig({ mode: 'fixed', fixed, min, max });
+            return;
+        }
+        if (min < 1 || max > 300 || min >= max || isNaN(min) || isNaN(max)) {
+            setIntervalError('Random range must be 1-300 and min < max');
+            stopTrading();
+            return;
+        }
+        setIntervalError('');
+        setTradeIntervalConfig({ mode: 'random', fixed, min, max });
     };
 
     return (
@@ -333,23 +389,70 @@ export default function GlobalBotControls({
                         </button>
                     </div>
 
-                    <div className="flex items-center space-x-2">
+                     <div className="flex flex-wrap items-center gap-2">
                         <input
                             id="advanced-toggle"
                             type="checkbox"
                             checked={isAdvancedMode}
-                              onChange={(e) => handleAdvancedChange(e.target.checked)}
+                            onChange={(e) => handleAdvancedChange(e.target.checked)}
                         />
                         <label htmlFor="advanced-toggle" className="text-sm text-gray-200">Advanced Mode</label>
                         <select
-                            className="ml-4 bg-gray-700 text-white text-xs rounded"
+                           className="bg-gray-700 text-white text-xs rounded"
                             value={executionMode}
                             onChange={(e) => handleModeChange(e.target.value as 'per-bot' | 'group')}
                         >
                             <option value="per-bot">Per-Bot Mode</option>
                             <option value="group">Group Mode</option>
                         </select>
+                        <div className="flex items-center ml-auto gap-1">
+                            <span className="text-sm text-gray-200">Trade Interval</span>
+                            <select
+                                className="bg-gray-700 text-white text-xs rounded"
+                                value={intervalMode}
+                                onChange={(e) => handleIntervalModeChange(e.target.value as 'fixed' | 'random')}
+                            >
+                                <option value="fixed">Fixed</option>
+                                <option value="random">Random</option>
+                            </select>
+                            {intervalMode === 'fixed' ? (
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={300}
+                                    value={fixedValue}
+                                    onChange={(e) => handleFixedInput(e.target.value)}
+                                    className="w-16 bg-gray-700 text-white text-xs px-1 rounded"
+                                />
+                            ) : (
+                                <>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={300}
+                                        value={minValue}
+                                        onChange={(e) => handleMinInput(e.target.value)}
+                                        className="w-14 bg-gray-700 text-white text-xs px-1 rounded"
+                                    />
+                                    <span className="text-gray-200">-</span>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={300}
+                                        value={maxValue}
+                                        onChange={(e) => handleMaxInput(e.target.value)}
+                                        className="w-14 bg-gray-700 text-white text-xs px-1 rounded"
+                                    />
+                                </>
+                            )}
+                            <span className="text-xs text-gray-400 ml-1">
+                                {intervalMode === 'fixed'
+                                    ? `Fixed: ${fixedValue}s`
+                                    : `Random: ${minValue}-${maxValue}s`}
+                            </span>
+                        </div>
                     </div>
+                    {intervalError && <p className="text-xs text-red-400">{intervalError}</p>}
                     {isAdvancedMode && (
                         <p className="text-xs text-red-400">
                             Advanced mode executes custom code and may have compliance risks.

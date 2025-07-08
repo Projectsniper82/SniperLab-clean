@@ -102,6 +102,14 @@ export interface BotInstance {
 // network value throughout the app.
 export type BotsByNetwork = Record<NetworkType, BotInstance[]>;
 
+export interface TradeIntervalConfig {
+  mode: 'fixed' | 'random';
+  fixed: number; // seconds
+  min: number; // seconds
+  max: number; // seconds
+}
+
+
 interface BotContextState {
   allBotsByNetwork: BotsByNetwork;
   setAllBotsByNetwork: React.Dispatch<React.SetStateAction<BotsByNetwork>>;
@@ -117,6 +125,8 @@ interface BotContextState {
   stopTrading: () => void;
   minTradeAmount: number | null;
   setMinTradeAmount: React.Dispatch<React.SetStateAction<number | null>>;
+  tradeIntervalConfig: TradeIntervalConfig;
+  setTradeIntervalConfig: (cfg: TradeIntervalConfig) => void;
   getSystemState: () => { allBots: BotInstance[]; tradeCounts: Record<string, number> };
 }
 
@@ -130,12 +140,71 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
   const { network, rpcUrl } = useNetwork();
   const { lastPrice, currentMarketCap, currentLpValue, solUsdPrice } =
     useChartData();
-  const { tokenAddress, isLpActive } = useToken();
-  const [botCode, setBotCode] = useState(DEFAULT_BOT_CODE);
+  const { tokenAddress, isLpActive, setTokenAddress } = useToken();
+
+  const loadBotCode = (net: NetworkType) => {
+    if (typeof window !== 'undefined') {
+      const saved = window.localStorage.getItem(`botCode-${net}`);
+      if (saved) return saved;
+    }
+    return DEFAULT_BOT_CODE;
+  };
+
+  const [botCodeByNetwork, setBotCodeByNetwork] = useState<Record<NetworkType, string>>({
+    devnet: loadBotCode('devnet'),
+    'mainnet-beta': loadBotCode('mainnet-beta'),
+  });
+
+  const botCode = botCodeByNetwork[network];
+  const setBotCode = useCallback<React.Dispatch<React.SetStateAction<string>>>(
+    (val) => {
+      setBotCodeByNetwork((prev) => {
+        const current = prev[network];
+        const newValue = typeof val === 'function' ? (val as any)(current) : val;
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(`botCode-${network}`, newValue);
+        }
+        return { ...prev, [network]: newValue };
+      });
+    },
+    [network]
+  );
   const [executionMode, setExecutionMode] = useState<'per-bot' | 'group'>('per-bot');
   const [isAdvancedMode, setIsAdvancedMode] = useState(false);
   const [isTradingActive, setIsTradingActive] = useState(false);
   const [minTradeAmount, setMinTradeAmount] = useState<number | null>(null);
+  const defaultInterval: TradeIntervalConfig = { mode: 'fixed', fixed: 5, min: 1, max: 2 };
+  const loadInterval = (net: NetworkType): TradeIntervalConfig => {
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem(`tradeInterval-${net}`);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          return { ...defaultInterval, ...parsed };
+        } catch {}
+      }
+    }
+    return defaultInterval;
+  };
+
+  const [tradeIntervalsByNetwork, setTradeIntervalsByNetwork] = useState<Record<NetworkType, TradeIntervalConfig>>({
+    devnet: loadInterval('devnet'),
+    'mainnet-beta': loadInterval('mainnet-beta'),
+  });
+
+  const tradeIntervalConfig = tradeIntervalsByNetwork[network];
+  const setTradeIntervalConfig = useCallback(
+    (cfg: TradeIntervalConfig) => {
+      setTradeIntervalsByNetwork((prev) => {
+        const updated = { ...prev, [network]: cfg };
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(`tradeInterval-${network}`, JSON.stringify(cfg));
+        }
+        return updated;
+      });
+    },
+    [network]
+  );
   const tradeCountsRef = useRef<Record<string, number>>({});
   const workerRef = useRef<Worker | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -145,7 +214,7 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
   const lastLpValueRef = useRef<number>(0);
 
   const updateMinTrade = useCallback(() => {
-     if (!tokenAddress) {
+    if (!tokenAddress) {
       setMinTradeAmount((prev) => {
         if (prev !== null) {
           append('[app] No token selected. Minimum trade amount is not available.');
@@ -155,15 +224,26 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
       });
       return;
     }
-    const amount = calculateMinTradeAmount(tokenAddress, network);
-    setMinTradeAmount((prev) => {
-      if (prev !== amount) {
-        if (amount !== null) {
-          append(`[app] minTradeAmount updated: ${amount} SOL`);
-        } else {
+   const result = calculateMinTradeAmount(tokenAddress, network);
+
+    if (!result) {
+      setMinTradeAmount((prev) => {
+        if (prev !== null) {
           append('[app] minTradeAmount unavailable');
+          return null;
         }
-        return amount;
+        return prev;
+      });
+      return;
+    }
+
+    setMinTradeAmount((prev) => {
+      if (prev !== result.amount) {
+        append(`[app] Min trade calculated: ${result.amount} SOL`);
+        if (result.usedFallback) {
+          append('[app] WARNING: Pool too shallow, using fallback min trade amount: 0.01 SOL');
+        }
+       return result.amount
       }
       return prev;
     });
@@ -278,6 +358,15 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
     updateMinTrade();
   }, [tokenAddress, network, updateMinTrade]);
 
+   const previousNetworkRef = useRef<NetworkType>(network);
+  useEffect(() => {
+    if (previousNetworkRef.current !== network) {
+      stopTrading();
+      setTokenAddress('');
+      previousNetworkRef.current = network;
+    }
+  }, [network, stopTrading, setTokenAddress]);
+
   useEffect(() => {
     if (network !== 'devnet') {
      setMinTradeAmount((prev) => (prev !== null ? null : prev));
@@ -301,16 +390,27 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [currentLpValue, network, updateMinTrade]);
 
+  const scheduleNext = useCallback(() => {
+    if (!isTradingActive) return;
+    const cfg = tradeIntervalConfig;
+    const delaySec = cfg.mode === 'fixed'
+      ? cfg.fixed
+      : cfg.min + Math.random() * (cfg.max - cfg.min);
+    const delayMs = delaySec * 1000;
+    intervalRef.current = setTimeout(() => {
+      runBotLogicRef.current?.();
+      scheduleNext();
+    }, delayMs);
+  }, [isTradingActive, tradeIntervalConfig]);
+
 
   useEffect(() => {
     if (isTradingActive) {
-     runBotLogicRef.current?.();
-      intervalRef.current = setInterval(() => {
-        runBotLogicRef.current?.();
-      }, 5000);
+    runBotLogicRef.current?.();
+      scheduleNext();
     } else {
       if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+        clearTimeout(intervalRef.current);
         intervalRef.current = null;
       }
       if (workerRef.current) {
@@ -320,13 +420,13 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
       }
     }
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (intervalRef.current) clearTimeout(intervalRef.current);
       if (workerRef.current) {
         workerRef.current.terminate();
         append('[app] Worker terminated');
       }
     };
-  }, [isTradingActive]);
+  }, [isTradingActive, scheduleNext]);
 
   const value: BotContextState = {
     allBotsByNetwork,
@@ -343,6 +443,8 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
     stopTrading,
     minTradeAmount,
     setMinTradeAmount,
+    tradeIntervalConfig,
+    setTradeIntervalConfig,
     getSystemState,
   };
 
