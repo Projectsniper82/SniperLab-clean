@@ -13,6 +13,7 @@ import { calculateStandardAmmSwapQuote } from '@/utils/ammSwapCalculator';
 import { swapRaydiumTokens } from '@/utils/raydiumSdkAdapter';
 import { createWalletAdapter } from '@/utils/walletAdapter';
 import { useBotService } from '@/context/BotServiceContext';
+import { useWalletBalances } from '@/context/WalletBalanceContext';
 
 // Approximate network fee for a simple transfer in SOL
 const ESTIMATED_TX_FEE_SOL = 0.00001;
@@ -48,6 +49,7 @@ export default function TradingBot({
 }: TradingBotProps) {
     const { connection, network } = useNetwork();
     const { getLogs, log } = useBotService();
+    const { balances, refreshBalance } = useWalletBalances();
     const [solBalance, setSolBalance] = useState(0);
     const [tokenBalance, setTokenBalance] = useState(0);
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -56,6 +58,15 @@ export default function TradingBot({
     // UI State
     const [isWithdrawVisible, setIsWithdrawVisible] = useState(false);
     const [isManualOpen, setIsManualOpen] = useState(false);
+    const balanceInfo = balances[botPublicKeyString];
+
+    useEffect(() => {
+        if (balanceInfo) {
+            setSolBalance(balanceInfo.sol);
+            setTokenBalance(balanceInfo.token);
+        }
+    }, [balanceInfo]);
+
 
     // Dynamic network values
     const [minRentSol, setMinRentSol] = useState(0);
@@ -85,44 +96,22 @@ export default function TradingBot({
     }, [log, botPublicKeyString]);
 
     const refreshBotBalances = useCallback(async () => {
-        // This guard prevents multiple refreshes from running at the same time
         if (isRefreshing) return;
         setIsRefreshing(true);
         addLog('Refreshing bot balances...');
         try {
             const botPublicKey = new PublicKey(botPublicKeyString);
-            const lamports = await connection.getBalance(botPublicKey);
-            const sol = lamports / LAMPORTS_PER_SOL;
-            setSolBalance(sol);
-
-            if (tokenMintAddress) {
-                try {
-                    const mintPublicKey = new PublicKey(tokenMintAddress);
-                    const ata = await getAssociatedTokenAddress(mintPublicKey, botPublicKey);
-                    const accountInfo = await getAccount(connection, ata);
-                    const tokenInfo = await connection.getParsedAccountInfo(mintPublicKey);
-                    const decimals = (tokenInfo.value?.data as any)?.parsed?.info?.decimals ?? 0;
-                    const balance = Number(accountInfo.amount) / Math.pow(10, decimals);
-                    setTokenBalance(balance);
-                    setTokenDecimals(decimals);
-                    addLog(`Balances: ${sol.toFixed(4)} SOL, ${balance.toFixed(4)} Tokens`);
-                } catch (e) {
-                    setTokenBalance(0);
-                    setTokenDecimals(0);
-                    addLog(`Balances: ${sol.toFixed(4)} SOL, 0.0000 Tokens (no account found)`);
-                }
-            } else {
-                setTokenBalance(0);
-                setTokenDecimals(0);
-                addLog(`Balances: ${sol.toFixed(4)} SOL (no token selected)`);
-            }
+const info = await refreshBalance(network, connection, botPublicKey, tokenMintAddress);
+            setSolBalance(info.sol);
+            setTokenBalance(info.token);
+            addLog(`Balances: ${info.sol.toFixed(4)} SOL, ${info.token.toFixed(4)} Tokens`);
         } catch (error) {
             console.error('Failed to refresh bot balances:', error);
             addLog('Error refreshing balances.');
         } finally {
             setIsRefreshing(false);
         }
-    }, [connection, botPublicKeyString, addLog, tokenMintAddress]); // FIX: `isRefreshing` has been removed from this array.
+     }, [connection, botPublicKeyString, addLog, tokenMintAddress, network, refreshBalance, isRefreshing]);
 
     useEffect(() => {
         refreshBotBalances();

@@ -8,6 +8,7 @@ import { BotServiceProvider } from '@/context/BotServiceContext';
 import { BotLogicProvider } from '@/context/BotLogicContext';
 import { GlobalLogProvider } from '@/context/GlobalLogContext';
 import { BotWalletReloadProvider } from '@/context/BotWalletReloadContext';
+import { WalletBalanceProvider } from '@/context/WalletBalanceContext';
 import { ChartDataProvider } from '@/context/ChartDataContext';
 import { BotProvider } from '@/context/BotContext';
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -25,7 +26,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ChartDataProvider>
             <GlobalLogProvider>
               <TokenProvider>
-                <BotProvider>
+                <WalletBalanceProvider>
+                  <BotProvider>
                   <BotServiceProvider>
                     <BotLogicProvider>
                       <AppWalletProvider>
@@ -36,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     </BotLogicProvider>
                   </BotServiceProvider>
                 </BotProvider>
+                </WalletBalanceProvider>
               </TokenProvider>
             </GlobalLogProvider>
           </ChartDataProvider>

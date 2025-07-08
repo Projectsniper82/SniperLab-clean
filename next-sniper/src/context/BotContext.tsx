@@ -13,7 +13,9 @@ import type { NetworkType } from './NetworkContext';
 import { useNetwork } from './NetworkContext';
 import { useChartData } from './ChartDataContext';
 import { useToken } from './TokenContext';
+import { useWalletBalances } from './WalletBalanceContext';
 import { Buffer } from 'buffer';
+import { PublicKey } from '@solana/web3.js';
 import { getSimulatedPool } from '../utils/simulatedPoolStore';
 import { calculateMinTradeAmount } from '../utils/minTradeAmount';
 
@@ -24,6 +26,10 @@ export const DEFAULT_BOT_CODE = `
 // Preset code always uses this value directly, and does not include any randomness.
 // You may copy this code and add your own randomization or logic in your own strategies.
 // Smart users may randomize or modify minTradeAmount for their custom logic. See documentation for advanced usage.
+// When Advanced Mode is enabled, context.walletBalances maps each bot wallet
+// address to its current balances.
+// When Advanced Mode is enabled, context.walletBalances provides current SOL
+// and token balances for each bot wallet keyed by address.
 /**
  * Default Strategy (Per-Bot Mode)
  * Runs for each bot individually. Buys minTradeAmount on devnet
@@ -137,10 +143,11 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
     devnet: [],
     'mainnet-beta': [],
   });
-  const { network, rpcUrl } = useNetwork();
+  const { network, rpcUrl, connection } = useNetwork();
   const { lastPrice, currentMarketCap, currentLpValue, solUsdPrice } =
     useChartData();
   const { tokenAddress, isLpActive, setTokenAddress } = useToken();
+  const { balances: walletBalances, updateAfterTrade } = useWalletBalances();
 
   const loadBotCode = (net: NetworkType) => {
     if (typeof window !== 'undefined') {
@@ -266,9 +273,17 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
         { type: 'module' }
       );
       workerRef.current.onmessage = (ev) => {
-        const { log, error } = ev.data || {};
+        const { log, error, balanceUpdate } = ev.data || {};
         if (log) append(log);
         if (error) append(`error: ${error}`);
+         if (balanceUpdate) {
+          const { wallet, solChange = 0, tokenChange = 0 } = balanceUpdate;
+          try {
+            updateAfterTrade(network, connection, new PublicKey(wallet), solChange, tokenChange, tokenAddress);
+          } catch (e) {
+            console.error('balance update failed', e);
+          }
+        }
       };
       workerRef.current.onerror = (e) => {
         append(`error: ${e.message}`);
@@ -302,6 +317,7 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
       },
       isAdvancedMode,
       minTradeAmount,
+      walletBalances,
     };
 
    if (network === 'devnet') {
@@ -339,7 +355,8 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
     executionMode,
     tokenAddress,
     isLpActive,
-     minTradeAmount,
+    minTradeAmount,
+    walletBalances,
   ]);
 
   const startTrading = useCallback(() => {
