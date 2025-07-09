@@ -553,7 +553,7 @@ export default function TradingBot({
                             <input type="text" placeholder="Recipient Address" value={withdrawSolAddress} onChange={(e) => setWithdrawSolAddress(e.target.value)} className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white" disabled={isProcessing} />
                             <input type="number" placeholder="SOL Amount" value={withdrawSolAmount} onChange={(e) => setWithdrawSolAmount(e.target.value)} className="w-full p-2 bg-gray-700 border border-gray-600 rounded" disabled={isProcessing} />
                              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                                <span className="cursor-pointer hover:underline" onClick={handleMaxSolClick}>Available: {solBalance.toFixed(6)}</span>
+                                 <span className="cursor-pointer hover:underline" onClick={handleMaxSolClick}>Available: {solBalance.toString()}</span>
                                 <button type="button" onClick={handleMaxSolClick} className="text-blue-400 hover:underline">Max</button>
                             </div>
                             {withdrawError && <p className="text-red-500 text-xs">{withdrawError}</p>}
@@ -567,7 +567,7 @@ export default function TradingBot({
                             <input type="text" placeholder="Recipient Address" value={withdrawTokenAddress} onChange={(e) => setWithdrawTokenAddress(e.target.value)} className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white" disabled={isProcessing || !tokenMintAddress} />
                             <input type="number" placeholder="Token Amount" value={withdrawTokenAmount} onChange={(e) => setWithdrawTokenAmount(e.target.value)} className="w-full p-2 bg-gray-700 border border-gray-600 rounded" disabled={isProcessing || !tokenMintAddress} />
                              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                                <span className="cursor-pointer hover:underline" onClick={handleMaxTokenClick}>Available: {tokenBalance.toFixed(6)}</span>
+                               <span className="cursor-pointer hover:underline" onClick={handleMaxTokenClick}>Available: {tokenBalance.toString()}</span>
                                 <button type="button" onClick={handleMaxTokenClick} className="text-blue-400 hover:underline">Max</button>
                             </div>
                             <button onClick={handleWithdrawTokenClick} disabled={isProcessing || !tokenMintAddress} className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 rounded transition text-white disabled:bg-gray-500">Withdraw Tokens</button>

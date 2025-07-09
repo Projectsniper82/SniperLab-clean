@@ -42,7 +42,8 @@ export const WalletBalanceProvider = ({ children }: { children: React.ReactNode 
       if (!mint) return 0;
       const ata = await getAssociatedTokenAddress(new PublicKey(mint), wallet);
       const res = await connection.getTokenAccountBalance(ata, 'confirmed');
-      return res.value.uiAmount || 0;
+      const raw = res.value.uiAmountString;
+      return raw ? parseFloat(raw) : 0;
     } catch {
       return 0;
     }
