@@ -443,7 +443,7 @@ export default function TradingBot({
 };
 
     const handleMaxTokenClick = () => {
-        setWithdrawTokenAmount(tokenBalance.toFixed(6));
+        setWithdrawTokenAmount(tokenBalance.toString());
     };
 
     return (
@@ -500,7 +500,7 @@ export default function TradingBot({
                             <div>
                                 <label className="block text-gray-400 text-sm mb-1">Buy Amount (SOL)</label>
                                 <input type="number" value={buyAmount} onChange={e => setBuyAmount(e.target.value)} className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white" step="any" min="0" />
-                                <p className="text-gray-500 text-xs mt-1">Available: <span className="cursor-pointer hover:underline" onClick={() => setBuyAmount(solBalance.toFixed(6))}>{solBalance.toFixed(6)}</span></p>
+                                <p className="text-gray-500 text-xs mt-1">Available: <span className="cursor-pointer hover:underline" onClick={() => setBuyAmount(solBalance.toString())}>{solBalance.toFixed(6)}</span></p>
                             <div className="bg-gray-700 p-2 rounded mt-2 space-y-1 text-sm">
                                 <div className="flex justify-between"><span className="text-gray-400">Min Tokens Out:</span><span className="text-white">{buyQuote ? buyQuote.minOut.toFixed(6) : '0.000000'}</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">Price Impact:</span><span className={`font-medium ${buyQuote && buyQuote.priceImpact > 5 ? 'text-red-400' : buyQuote && buyQuote.priceImpact > 1 ? 'text-yellow-400' : 'text-green-400'}`}>{buyQuote ? `${buyQuote.priceImpact.toFixed(4)}%` : '0.00%'}</span></div>
@@ -509,7 +509,7 @@ export default function TradingBot({
                         <div>
                             <label className="block text-gray-400 text-sm mb-1">Sell Amount (Token)</label>
                             <input type="number" value={sellAmount} onChange={e => setSellAmount(e.target.value)} className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white" step="any" min="0" />
-                            <p className="text-gray-500 text-xs mt-1">Available: <span className="cursor-pointer hover:underline" onClick={() => setSellAmount(tokenBalance.toFixed(6))}>{tokenBalance.toFixed(6)}</span></p>
+                            <p className="text-gray-500 text-xs mt-1">Available: <span className="cursor-pointer hover:underline" onClick={() => setSellAmount(tokenBalance.toString())}>{tokenBalance.toFixed(6)}</span></p>
                             <div className="bg-gray-700 p-2 rounded mt-2 space-y-1 text-sm">
                                 <div className="flex justify-between"><span className="text-gray-400">Min SOL Out:</span><span className="text-white">{sellQuote ? sellQuote.minOut.toFixed(6) : '0.000000'}</span></div>
                                 <div className="flex justify-between"><span className="text-gray-400">Price Impact:</span><span className={`font-medium ${sellQuote && sellQuote.priceImpact > 5 ? 'text-red-400' : sellQuote && sellQuote.priceImpact > 1 ? 'text-yellow-400' : 'text-green-400'}`}>{sellQuote ? `${sellQuote.priceImpact.toFixed(4)}%` : '0.00%'}</span></div>
