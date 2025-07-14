@@ -143,8 +143,28 @@ export function loadBotWallet(network: NetworkType): Keypair | null {
 export function clearBotWallet(network: NetworkType): void {
     clearBotWallets(network);
 }
-export function changeWalletPassword(network: NetworkType, newPassword: string): void {
-    const wallets = loadBotWallets(network);
+export function changeWalletPassword(newPassword: string): void {
+    const networks: NetworkType[] = ['devnet', 'mainnet-beta'];
+
+    const walletsByNetwork: Record<NetworkType, Keypair[]> = {
+        'devnet': [],
+        'mainnet-beta': [],
+    };
+
+    for (const net of networks) {
+        try {
+            walletsByNetwork[net] = loadBotWallets(net);
+        } catch {
+            walletsByNetwork[net] = [];
+        }
+    }
+
     setEncryptionPassword(newPassword);
-    saveBotWallets(network, wallets);
+
+    for (const net of networks) {
+        const wallets = walletsByNetwork[net];
+        if (wallets.length > 0) {
+            saveBotWallets(net, wallets);
+        }
+    }
 }

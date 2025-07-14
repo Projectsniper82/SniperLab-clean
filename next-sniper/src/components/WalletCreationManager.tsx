@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useGlobalLogs } from '@/context/GlobalLogContext';
-import { useNetwork, NetworkType } from '@/context/NetworkContext';
+import { useNetwork } from '@/context/NetworkContext';
 import { Keypair } from '@solana/web3.js';
 import {
    
@@ -58,7 +58,7 @@ export default function WalletCreationManager({ distributeFunds, onClearWallets,
         const newPass = window.prompt('Enter new wallet password:');
         if (!newPass) return;
         try {
-            changeWalletPassword(network, newPass);
+            changeWalletPassword(newPass);
             alert('Wallet password updated.');
         } catch (err: any) {
             alert(err?.message || 'Failed to change password.');
