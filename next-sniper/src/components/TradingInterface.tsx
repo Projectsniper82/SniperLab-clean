@@ -18,6 +18,7 @@ import { calculateStandardAmmSwapQuote } from '@/utils/ammSwapCalculator';
 import { DiscoveredPoolDetailed } from '@/utils/poolFinder';
 import { NetworkType, useNetwork } from '@/context/NetworkContext'; // Assuming useNetwork is correctly imported
 import { executeJupiterSwap } from '@/utils/jupiterSwapUtil';
+import { toLamports } from '@/utils/solanaUtils';
 import { getOptimalPriorityFee } from '@/utils/priorityFee';
 // ... rest of your TradingInterfaceProps and component
 
@@ -266,7 +267,7 @@ function TradingInterface({
 
         try {
             let txSignature: string;
-            const amountInLamports = new BN(new Decimal(buyAmountSOLFloat).mul(1e9).toFixed(0));
+            const amountInLamports = new BN(toLamports(buyAmountSOLFloat, 9).toString());
 
             if (network === 'mainnet-beta') {
                 const priorityFee = await getOptimalPriorityFee(connection);
@@ -325,7 +326,7 @@ function TradingInterface({
             return;
         }
         const rawTokenBalanceBN = new BN(tokenBalance);
-        const rawTokensToSell = new BN(new Decimal(sellAmountTokensFloat).mul(10 ** tokenDecimals).toFixed(0));
+       const rawTokensToSell = new BN(toLamports(sellAmountTokensFloat, tokenDecimals).toString());
         if (rawTokensToSell.gt(rawTokenBalanceBN)) {
             setErrorMessage(`Not enough token balance.`);
             return;

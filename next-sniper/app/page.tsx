@@ -155,7 +155,7 @@ export default function HomePage() {
             isPhantom: globalWallet.wallet?.adapter.name === 'Phantom',
         };
     }, [globalWallet.connected, globalWallet.publicKey, globalWallet.wallet, globalWallet.signTransaction, globalWallet.signAllTransactions]);
-    const { tokenAddress, setTokenAddress } = useToken();
+    const { tokenAddress, tokenDecimals, setTokenAddress, setTokenDecimals } = useToken();
     const [tokenInfo, setTokenInfo] = useState<TokenInfoState | null>(null);
     const [solBalance, setSolBalance] = useState(0);
     const [tokenBalance, setTokenBalance] = useState('0');
@@ -485,6 +485,7 @@ const loadTokenInfo = useCallback(async () => {
         setErrorMessage('');
         setDiscoveredPools([]);
         setSelectedPool(null);
+        setTokenDecimals(null);
         return;
     }
 
@@ -509,6 +510,7 @@ const loadTokenInfo = useCallback(async () => {
             isInitialized: true,
         };
         setTokenInfo(ti);
+        setTokenDecimals(mintInfo.decimals);
         setNotification({ show: true, message: 'Token info loaded!', type: 'success' });
 
         if (wallet?.publicKey) {
@@ -523,6 +525,7 @@ const loadTokenInfo = useCallback(async () => {
         setNotification({ show: true, message: msg, type: 'error' });
         setTokenInfo(null);
         setTokenBalance('0');
+        setTokenDecimals(null);
     } finally {
         // This GUARANTEES the loading spinner is turned off,
         // no matter if loading the token succeeded or failed.
@@ -738,6 +741,7 @@ useEffect(() => {
     const handleNetworkChange = (newNetwork: NetworkType) => {
         if (network === newNetwork) return;
         setTokenAddress(''); setTokenInfo(null); setSolBalance(0); setTokenBalance('0');
+        setTokenDecimals(null);
         setLpTokenBalance('0'); setUserPairedSOL(0); setUserPairedToken(0); setTotalLpSupply('0'); setLpTokenDecimals(0);
         setErrorMessage(''); setIsLoading(false);
         console.log("[HomePage][setIsLoading] set to FALSE (FUNCTION_NAME)");

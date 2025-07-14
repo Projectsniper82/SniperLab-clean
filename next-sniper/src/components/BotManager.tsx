@@ -24,11 +24,12 @@ import { useChartData } from '@/context/ChartDataContext';
 
 interface BotManagerProps {
     selectedTokenAddress: string;
+    tokenDecimals: number;
     isLpActive: boolean;
     bots: BotInstance[];
 }
 
-export default function BotManager({ selectedTokenAddress, isLpActive, bots }: BotManagerProps) {
+export default function BotManager({ selectedTokenAddress, tokenDecimals, isLpActive, bots }: BotManagerProps) {
    const { connection, network, rpcUrl } = useNetwork();
     const { publicKey: userPublicKey, sendTransaction } = useWallet();
     const { addBot, removeBot } = useBotService();
@@ -265,6 +266,7 @@ export default function BotManager({ selectedTokenAddress, isLpActive, bots }: B
                                 onWithdraw={createWithdrawHandler(wallet)}
                                 onWithdrawToken={createWithdrawTokenHandler(wallet)}
                                 tokenMintAddress={selectedTokenAddress}
+                                tokenDecimals={tokenDecimals}
                                 isLogicEnabled={isLogicEnabled}
                                 selectedTokenAddress={selectedTokenAddress}
                                 isLpActive={isLpActive}

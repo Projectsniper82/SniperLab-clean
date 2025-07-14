@@ -146,7 +146,7 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
   const { network, rpcUrl, connection } = useNetwork();
   const { lastPrice, currentMarketCap, currentLpValue, solUsdPrice } =
     useChartData();
-  const { tokenAddress, isLpActive, setTokenAddress } = useToken();
+  const { tokenAddress, tokenDecimals, setTokenDecimals, isLpActive, setTokenAddress } = useToken();
   const { balances: walletBalances, updateAfterTrade } = useWalletBalances();
 
   const loadBotCode = (net: NetworkType) => {
@@ -307,7 +307,7 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
     const context: any = {
       rpcUrl,
       network,
-      token: { address: tokenAddress },
+      token: { address: tokenAddress, decimals: tokenDecimals ?? undefined },
       isLpActive,
       market: {
         lastPrice,
@@ -388,9 +388,10 @@ export const BotProvider = ({ children }: { children: React.ReactNode }) => {
     if (previousNetworkRef.current !== network) {
       stopTrading();
       setTokenAddress('');
+      setTokenDecimals(null);
       previousNetworkRef.current = network;
     }
-  }, [network, stopTrading, setTokenAddress]);
+  }, [network, stopTrading, setTokenAddress, setTokenDecimals]);
 
   useEffect(() => {
     if (network !== 'devnet') {

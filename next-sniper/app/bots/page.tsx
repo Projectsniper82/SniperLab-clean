@@ -75,7 +75,7 @@ export default function TradingBotsPage() {
     };
 
     // FIX: Get the setter function from the context
-    const { tokenAddress, isLpActive, setIsLpActive, setTokenAddress } = useToken();
+     const { tokenAddress, tokenDecimals, setTokenDecimals, isLpActive, setIsLpActive, setTokenAddress } = useToken();
 
     const currentBots = allBotsByNetwork[network];
     // --- Placeholder for your LP fetching logic ---
@@ -332,8 +332,9 @@ export default function TradingBotsPage() {
 
                 <BotManager
                     selectedTokenAddress={tokenAddress}
+                    tokenDecimals={tokenDecimals ?? 0}
                     isLpActive={isLpActive}
-                   bots={currentBots} 
+                    bots={currentBots} 
                 />
             </main>
         </div>

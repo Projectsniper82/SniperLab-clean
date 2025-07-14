@@ -6,6 +6,8 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 interface TokenContextState {
   tokenAddress: string;
   setTokenAddress: (address: string) => void;
+  tokenDecimals: number | null;
+  setTokenDecimals: (decimals: number | null) => void;
   isLpActive: boolean;
   setIsLpActive: (isActive: boolean) => void;
 }
@@ -14,6 +16,7 @@ const TokenContext = createContext<TokenContextState | undefined>(undefined);
 
 export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const [tokenAddress, setTokenAddress] = useState('');
+  const [tokenDecimals, setTokenDecimals] = useState<number | null>(null);
   
   // FIX: Create the state for isLpActive here
   const [isLpActive, setIsLpActive] = useState(false);
@@ -22,6 +25,8 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const value = {
     tokenAddress,
     setTokenAddress,
+    tokenDecimals,
+    setTokenDecimals,
     isLpActive,
     setIsLpActive
   };

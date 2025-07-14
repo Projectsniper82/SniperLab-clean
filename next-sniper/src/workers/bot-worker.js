@@ -5,6 +5,7 @@ import { NATIVE_MINT } from '@solana/spl-token';
 import * as web3 from '@solana/web3.js';
 import { swapRaydiumTokens } from '../utils/raydiumSdkAdapter.js';
 import { executeJupiterSwap } from '../utils/jupiterSwapUtil';
+import { toLamports } from '../utils/solanaUtils';
 import { createWalletAdapter } from '../utils/walletAdapter.js';
 
 globalThis.Buffer = globalThis.Buffer || Buffer;
@@ -14,7 +15,7 @@ const pausedWallets = {};
 function createTradeApi(wallet, ctx, log) {
    const buildAmount = (amt) => {
     const decimals = ctx.token?.decimals || 0;
-    return new BN(Math.round(amt * 10 ** decimals));
+   return new BN(toLamports(amt, decimals).toString());
   };
 
   return {

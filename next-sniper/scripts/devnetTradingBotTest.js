@@ -17,7 +17,7 @@ const { executeJupiterSwap } = require('../src/utils/jupiterSwapUtil');
       connection,
       inputMint: new PublicKey('So11111111111111111111111111111111111111112'),
       outputMint: new PublicKey('So11111111111111111111111111111111111111112'),
-      amount: new BN(1),
+      amount: new BN(require('../src/utils/solanaUtils').toLamports(1, 0).toString()),
       slippageBps: 50,
       onlyGetQuote: true
     });

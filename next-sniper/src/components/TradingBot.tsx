@@ -7,6 +7,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import BN from 'bn.js';
 import Decimal from 'decimal.js';
 import { executeJupiterSwap } from '@/utils/jupiterSwapUtil';
+import { toLamports } from '@/utils/solanaUtils';
 import { getOptimalPriorityFee } from '@/utils/priorityFee';
 import { getSimulatedPool, updateSimulatedPoolAfterTrade } from '@/utils/simulatedPoolStore';
 import { calculateStandardAmmSwapQuote } from '@/utils/ammSwapCalculator';
@@ -22,6 +23,7 @@ interface TradingBotProps {
     botWallet: Keypair;
     botPublicKeyString: string;
     tokenMintAddress: string;
+    tokenDecimals: number;
     selectedTokenAddress: string;
     isLpActive: boolean;
     isLogicEnabled: boolean;
@@ -39,6 +41,7 @@ export default function TradingBot({
     botWallet,
     botPublicKeyString,
     tokenMintAddress,
+    tokenDecimals,
     selectedTokenAddress,
     isLpActive,
     isLogicEnabled,
@@ -86,7 +89,6 @@ export default function TradingBot({
     const [slippage, setSlippage] = useState(1);
     const [priorityFee, setPriorityFee] = useState('');
     const [recommendedPriorityFee, setRecommendedPriorityFee] = useState<number | null>(null);
-    const [tokenDecimals, setTokenDecimals] = useState(0);
     const [buyQuote, setBuyQuote] = useState<any>(null);
     const [sellQuote, setSellQuote] = useState<any>(null);
 
@@ -276,7 +278,7 @@ export default function TradingBot({
         addLog(`Initiating buy of ${amountSol} SOL worth of tokens...`);
         try {
             const walletAdapter = createWalletAdapter(botWallet, connection);
-            const amountLamports = new BN(new Decimal(amountSol).mul(1e9).toFixed(0));
+             const amountLamports = new BN(toLamports(amountSol, 9).toString());
             const fee = parseInt(priorityFee) || recommendedPriorityFee || 1000;
 
             let txId: string;
@@ -325,7 +327,7 @@ export default function TradingBot({
         addLog(`Initiating sell of ${amountTokens} tokens...`);
         try {
             const walletAdapter = createWalletAdapter(botWallet, connection);
-            const amountRaw = new BN(new Decimal(amountTokens).mul(new Decimal(10).pow(tokenDecimals)).toFixed(0));
+            const amountRaw = new BN(toLamports(amountTokens, tokenDecimals).toString());
             const fee = parseInt(priorityFee) || recommendedPriorityFee || 1000;
 
             let txId: string;
