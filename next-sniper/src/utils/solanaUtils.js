@@ -1,6 +1,11 @@
 import { PublicKey } from '@solana/web3.js';
 import { getMint } from '@solana/spl-token';
 
+// Convert a UI amount to lamports based on the mint's decimals
+export const toLamports = (amount, decimals) => {
+  return Math.floor(amount * 10 ** decimals);
+};
+
 export const getTokenInfo = async (connection, tokenAddress) => {
   try {
     if (!tokenAddress || typeof tokenAddress !== 'string' || tokenAddress.trim().length === 0) {
