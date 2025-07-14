@@ -10,6 +10,7 @@ import {
     generateBotWallet,
     saveBotWallets,
     loadBotWallets,
+    loadBotWalletsWithRetry,
     clearBotWallets,
 } from '@/utils/botWalletManager';
 import { useBotService } from '@/context/BotServiceContext';
@@ -42,7 +43,7 @@ export default function BotManager({ selectedTokenAddress, isLpActive, bots }: B
     useEffect(() => {
         setIsLoading(true);
         try {
-            const loaded = loadBotWallets(network);
+            const loaded = loadBotWalletsWithRetry(network);
             setBotWallets(loaded);
             // sync loaded wallets with global context
             setAllBotsByNetwork(prev => ({
@@ -60,7 +61,7 @@ export default function BotManager({ selectedTokenAddress, isLpActive, bots }: B
 
         registerReloader(() => {
             try {
-                const refreshed = loadBotWallets(network);
+                const refreshed = loadBotWalletsWithRetry(network);
                 setBotWallets(refreshed);
                 setAllBotsByNetwork(prev => ({
                     ...prev,

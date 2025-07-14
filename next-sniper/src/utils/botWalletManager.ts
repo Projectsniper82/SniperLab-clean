@@ -2,6 +2,9 @@ import { Keypair } from '@solana/web3.js';
 import { NetworkType } from '@/context/NetworkContext';
 
 let cachedPassword: string | null = null;
+export const setEncryptionPassword = (password: string): void => {
+    cachedPassword = password;
+};
 
 export const resetEncryptionPassword = (): void => {
     cachedPassword = null;
@@ -109,6 +112,18 @@ export function loadBotWallets(network: NetworkType): Keypair[] {
         throw new Error('Incorrect password or corrupted wallet data.');
     }
 }
+export function loadBotWalletsWithRetry(network: NetworkType): Keypair[] {
+    while (true) {
+        try {
+            return loadBotWallets(network);
+        } catch (e: any) {
+            if (typeof window === "undefined" || !window.confirm(`${e.message}
+Try again?`)) {
+                throw e;
+            }
+        }
+    }
+}
 
 export function clearBotWallets(network: NetworkType): void {
      localStorage.removeItem(storageKey(network));
@@ -127,4 +142,9 @@ export function loadBotWallet(network: NetworkType): Keypair | null {
 
 export function clearBotWallet(network: NetworkType): void {
     clearBotWallets(network);
+}
+export function changeWalletPassword(network: NetworkType, newPassword: string): void {
+    const wallets = loadBotWallets(network);
+    setEncryptionPassword(newPassword);
+    saveBotWallets(network, wallets);
 }

@@ -62,6 +62,10 @@ If an incorrect password is entered when loading wallets, the UI will now show
 an explicit error message instead of loading empty wallets. The cached password
 is cleared so the next load attempt will prompt you again.
 
+The prompt will keep reappearing until the correct password is provided so you
+can retry as many times as needed. You can also change the encryption password
+later via the **Change Wallet Password** button in the Bot Creation Manager.
+
 
 ## Strategy Context
 

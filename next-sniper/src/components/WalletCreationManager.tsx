@@ -7,6 +7,8 @@ import { Keypair } from '@solana/web3.js';
 import {
    
     loadBotWallets,
+     loadBotWalletsWithRetry,
+    changeWalletPassword
 } from '@/utils/botWalletManager';
 import { NumberInputStepper } from '@/components/NumberInputStepper';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
@@ -29,7 +31,7 @@ export default function WalletCreationManager({ distributeFunds, onClearWallets,
     const { append } = useGlobalLogs();
 
         const handleClearAllWallets = async () => {
-        const wallets = loadBotWallets(network);
+        const wallets = loadBotWalletsWithRetry(network);
         let hasBalance = false;
         for (const w of wallets) {
             const sol = await connection.getBalance(w.publicKey);
@@ -49,6 +51,17 @@ export default function WalletCreationManager({ distributeFunds, onClearWallets,
         if (proceed) {
             onClearWallets();
             append('Cleared all bot wallets');
+        }
+    };
+
+    const handleChangePassword = () => {
+        const newPass = window.prompt('Enter new wallet password:');
+        if (!newPass) return;
+        try {
+            changeWalletPassword(network, newPass);
+            alert('Wallet password updated.');
+        } catch (err: any) {
+            alert(err?.message || 'Failed to change password.');
         }
     };
 
@@ -128,6 +141,13 @@ export default function WalletCreationManager({ distributeFunds, onClearWallets,
                             className="w-full py-2 bg-red-900/50 hover:bg-red-800/70 border border-red-700/50 rounded-lg transition text-red-300 text-sm font-semibold disabled:bg-gray-500 disabled:cursor-not-allowed"
                         >
                             Clear All Bot Wallets
+                        </button>
+                         <button
+                            onClick={handleChangePassword}
+                            disabled={isProcessing}
+                            className="w-full py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition text-white text-sm font-semibold"
+                        >
+                            Change Wallet Password
                         </button>
                     </div>
                 </div>
