@@ -454,7 +454,7 @@ export const createRaydiumPool = async (
 
 // --- Swap Raydium Tokens ---
 export const swapRaydiumTokens = async (
-    wallet, connection, poolIdString, inputMintAddress, amountInBN, slippage
+    wallet, connection, poolIdString, inputMintAddress, amountInBN, slippage, priorityFeeMicroLamports = 50000
 ) => {
     console.log(`[Swap Raydium] ---> Start`);
     // Ensure currentNetwork is passed to initRaydiumSdk if it's not using a global/contextual one

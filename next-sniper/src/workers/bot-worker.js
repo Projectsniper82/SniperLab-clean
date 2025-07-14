@@ -5,6 +5,7 @@ import { NATIVE_MINT } from '@solana/spl-token';
 import * as web3 from '@solana/web3.js';
 import { swapRaydiumTokens } from '../utils/raydiumSdkAdapter.js';
 import { executeJupiterSwap } from '../utils/jupiterSwapUtil';
+import { getOptimalPriorityFee } from '../utils/priorityFee';
 import { toLamports } from '../utils/solanaUtils';
 import { createWalletAdapter } from '../utils/walletAdapter.js';
 
@@ -51,13 +52,15 @@ function createTradeApi(wallet, ctx, log) {
           log('[trade] Missing poolId for Raydium buy');
           throw new Error('poolId required');
         }
+        const devPriority = await getOptimalPriorityFee(ctx.connection);
         sig = await swapRaydiumTokens(
           wallet,
           ctx.connection,
           poolId,
           NATIVE_MINT.toBase58(),
           amountBn,
-          slippageBps / 10000
+          slippageBps / 10000,
+          devPriority
         );
       }
       self.postMessage({ balanceUpdate: { wallet: key, solChange: -amount } });
@@ -101,7 +104,8 @@ function createTradeApi(wallet, ctx, log) {
           poolId,
           ctx.token.address,
           amountBn,
-          slippageBps / 10000
+          slippageBps / 10000,
+          devPriority
         );
       }
     self.postMessage({ balanceUpdate: { wallet: key, tokenChange: -amount } });

@@ -4,23 +4,15 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 import Decimal from 'decimal.js';
 import { NATIVE_MINT } from '@solana/spl-token';
-// REMOVE or COMMENT OUT this old import and call:
-// import { initRaydiumSdk } from '@/utils/initRaydiumSdk';
-// await initRaydiumSdk(); // ensure it’s ready  <--- REMOVE THIS LINE
-
-// You will use initRaydiumSdkForUser inside mainnetBuyUtil.ts as we set it up.
-// TradingInterface itself doesn't need to call initRaydiumSdkForUser directly
-// if mainnetBuyUtil.ts handles SDK initialization internally with the passed connection and wallet.
 
 import { getSimulatedPool, updateSimulatedPoolAfterTrade } from '@/utils/simulatedPoolStore';
-import { isRaydiumPool, swapRaydiumTokens } from '@/utils/raydiumSdkAdapter'; // Ensure this adapter is correctly set up
+import { isRaydiumPool, swapRaydiumTokens } from '@/utils/raydiumSdkAdapter'; 
 import { calculateStandardAmmSwapQuote } from '@/utils/ammSwapCalculator';
 import { DiscoveredPoolDetailed } from '@/utils/poolFinder';
-import { NetworkType, useNetwork } from '@/context/NetworkContext'; // Assuming useNetwork is correctly imported
+import { NetworkType, useNetwork } from '@/context/NetworkContext'; 
 import { executeJupiterSwap } from '@/utils/jupiterSwapUtil';
 import { toLamports } from '@/utils/solanaUtils';
 import { getOptimalPriorityFee } from '@/utils/priorityFee';
-// ... rest of your TradingInterfaceProps and component
 
 type NotificationType = 'success' | 'error' | 'info' | '';
 
@@ -284,7 +276,16 @@ function TradingInterface({
             } else { // Devnet Logic
                 if (!selectedPool || !selectedPool.id) throw new Error("Devnet pool not selected.");
                 const slippageDecimal = slippage / 100;
-                txSignature = await swapRaydiumTokens(wallet, connection, selectedPool.id, NATIVE_MINT.toBase58(), amountInLamports, slippageDecimal);
+                const devPriority = await getOptimalPriorityFee(connection);
+                txSignature = await swapRaydiumTokens(
+                    wallet,
+                    connection,
+                    selectedPool.id,
+                    NATIVE_MINT.toBase58(),
+                    amountInLamports,
+                    slippageDecimal,
+                    devPriority
+                );
                 let tokensBought = 0;
                 let solSpent = buyAmountSOLFloat;
                 if (jupiterQuote && jupiterQuote.outAmount) {
@@ -355,7 +356,16 @@ function TradingInterface({
             } else { // Devnet Logic
                 if (!selectedPool || !selectedPool.id) throw new Error("Devnet pool not selected.");
                 const slippageDecimal = slippage / 100;
-                txSignature = await swapRaydiumTokens(wallet, connection, selectedPool.id, tokenAddress, rawTokensToSell, slippageDecimal);
+                const devPriority = await getOptimalPriorityFee(connection);
+                txSignature = await swapRaydiumTokens(
+                    wallet,
+                    connection,
+                    selectedPool.id,
+                    tokenAddress,
+                    rawTokensToSell,
+                    slippageDecimal,
+                    devPriority
+                );
                 let tokensSold = sellAmountTokensFloat;
                 let solReceived = 0;
                 if (jupiterQuote && jupiterQuote.outAmount) {

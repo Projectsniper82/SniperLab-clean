@@ -299,13 +299,15 @@ export default function TradingBot({
             } else {
                 const pool = getSimulatedPool();
                 if (!pool || !pool.id) throw new Error('No devnet pool available.');
+                const devPriority = await getOptimalPriorityFee(connection);
                 txId = await swapRaydiumTokens(
                     walletAdapter,
                     connection,
                     pool.id,
                     NATIVE_MINT.toBase58(),
                     amountLamports,
-                    slippage / 100
+                    slippage / 100,
+                    devPriority
                 );
                 updateSimulatedPoolAfterTrade(0, amountSol);
             }
@@ -348,13 +350,15 @@ export default function TradingBot({
             } else {
                 const pool = getSimulatedPool();
                 if (!pool || !pool.id) throw new Error('No devnet pool available.');
+                const devPriority = await getOptimalPriorityFee(connection);
                 txId = await swapRaydiumTokens(
                     walletAdapter,
                     connection,
                     pool.id,
                     tokenMintAddress,
                     amountRaw,
-                    slippage / 100
+                    slippage / 100,
+                    devPriority
                 );
                 updateSimulatedPoolAfterTrade(amountTokens, 0);
             }

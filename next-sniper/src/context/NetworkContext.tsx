@@ -46,7 +46,7 @@ export const NetworkProvider = ({ children }: { children: ReactNode }) => {
     setNetwork,
     connection,
     rpcUrl,
-  }), [network, setNetwork, rpcUrl]); // <--- CORRECTED STABLE DEPENDENCIES
+  }), [network, setNetwork, rpcUrl]); 
 
   return (
     <NetworkContext.Provider value={contextValue}>
