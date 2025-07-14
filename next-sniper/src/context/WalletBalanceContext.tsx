@@ -1,11 +1,12 @@
 'use client';
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { Connection, PublicKey } from '@solana/web3.js';
-import { getAssociatedTokenAddress } from '@solana/spl-token';
+import { getAssociatedTokenAddress, NATIVE_MINT } from '@solana/spl-token';
 import { NetworkType } from './NetworkContext';
 
 interface BalanceInfo {
   sol: number;
+  wsol: number;
   token: number;
   tradeCount: number;
 }
@@ -57,8 +58,9 @@ export const WalletBalanceProvider = ({ children }: { children: React.ReactNode 
   ): Promise<BalanceInfo> => {
     const lamports = await connection.getBalance(wallet);
     const sol = lamports / 1e9;
+    const wsol = await fetchTokenBalance(connection, wallet, NATIVE_MINT.toBase58());
     const token = await fetchTokenBalance(connection, wallet, tokenMint);
-    const info: BalanceInfo = { sol, token, tradeCount: 0 };
+    const info: BalanceInfo = { sol, wsol, token, tradeCount: 0 };
     setBalances((prev) => ({ ...prev, [wallet.toBase58()]: info }));
     return info;
   }, [fetchTokenBalance]);
@@ -73,12 +75,13 @@ export const WalletBalanceProvider = ({ children }: { children: React.ReactNode 
   ) => {
     let tradeCount = 0;
     setBalances((prev) => {
-      const existing = prev[wallet.toBase58()] || { sol: 0, token: 0, tradeCount: 0 };
+      const existing = prev[wallet.toBase58()] || { sol: 0, wsol: 0, token: 0, tradeCount: 0 };
       tradeCount = existing.tradeCount + 1;
       return {
         ...prev,
         [wallet.toBase58()]: {
           sol: existing.sol + solChange,
+          wsol: existing.wsol,
           token: existing.token + tokenChange,
           tradeCount,
         },

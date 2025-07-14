@@ -54,6 +54,7 @@ export default function TradingBot({
     const { getLogs, log } = useBotService();
     const { balances, refreshBalance } = useWalletBalances();
     const [solBalance, setSolBalance] = useState(0);
+    const [wsolBalance, setWsolBalance] = useState(0);
     const [tokenBalance, setTokenBalance] = useState(0);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -66,6 +67,7 @@ export default function TradingBot({
     useEffect(() => {
         if (balanceInfo) {
             setSolBalance(balanceInfo.sol);
+            setWsolBalance(balanceInfo.wsol);
             setTokenBalance(balanceInfo.token);
         }
     }, [balanceInfo]);
@@ -108,8 +110,9 @@ export default function TradingBot({
             const botPublicKey = new PublicKey(botPublicKeyString);
             const info = await refreshBalance(network, connection, botPublicKey, tokenMintAddress);
             setSolBalance(info.sol);
+            setWsolBalance(info.wsol);
             setTokenBalance(info.token);
-            addLog(`Balances: ${info.sol.toFixed(4)} SOL, ${info.token.toFixed(4)} Tokens`);
+            addLog(`Balances: ${info.sol.toFixed(4)} SOL, ${info.wsol.toFixed(4)} WSOL, ${info.token.toFixed(4)} Tokens`);
         } catch (error) {
             console.error('Failed to refresh bot balances:', error);
             addLog('Error refreshing balances.');
@@ -466,16 +469,18 @@ export default function TradingBot({
                 </span>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-center">
-                <div className="bg-gray-800 p-3 rounded-lg">
-                    <p className="text-sm text-gray-400">Bot SOL Balance</p>
-                    <p className="text-xl font-bold text-white">{solBalance.toFixed(4)}</p>
+             <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-center">
+                <div className="bg-gray-800 p-2 rounded-lg">
+                    <p className="text-sm text-gray-400">Bot SOL / WSOL</p>
+                    <p className="text-xl font-bold text-white">
+                        {solBalance.toFixed(4)} / {wsolBalance.toFixed(4)}
+                    </p>
                 </div>
                 <div className="bg-gray-800 p-3 rounded-lg">
                     <p className="text-sm text-gray-400">Bot Token Balance</p>
                     <p className="text-xl font-bold text-white">{tokenBalance.toFixed(4)}</p>
                 </div>
-                <div className="bg-gray-800 p-3 rounded-lg col-span-2 md:col-span-1">
+                <div className="bg-gray-800 p-2 rounded-lg col-span-2 md:col-span-1">
                     <button onClick={refreshBotBalances} disabled={isRefreshing || isProcessing} className="w-full h-full text-sm font-semibold text-gray-300 hover:text-white transition disabled:opacity-50">
                         {isRefreshing ? 'Refreshing...' : 'Refresh Balances'}
                     </button>
