@@ -65,7 +65,8 @@ is cleared so the next load attempt will prompt you again.
 The prompt will keep reappearing until the correct password is provided so you
 can retry as many times as needed. You can also change the encryption password
 later via the **Change Wallet Password** button in the Bot Creation Manager.
-
+Changing the password will now update the wallets stored for both **devnet** and
+**mainnet-beta**, so all networks remain in sync.
 
 ## Strategy Context
 
