@@ -102,13 +102,9 @@ export default function LiveTokenChart({
     const [ohlcData, setOhlcData] = useState([]);
     const [currentCandle, setCurrentCandle] = useState(null);
 
-     useEffect(() => {
+    useEffect(() => {
         setHasMounted(true);
     }, []);
-
-    if (!hasMounted) {
-        return <div style={{ width: '100%', height: 420, backgroundColor: '#000' }} />;
-    }
 
     const {
         rawPriceHistory,
@@ -128,10 +124,6 @@ export default function LiveTokenChart({
     const stopTrackingRef = useRef(stopTracking);
     const lastBrushInteractionRef = useRef(0);
     const prevDataLenRef = useRef(0);
-
-     useEffect(() => {
-        setHasMounted(true);
-    }, []);
 
     useEffect(() => { startTrackingRef.current = startTracking; }, [startTracking]);
     useEffect(() => { stopTrackingRef.current = stopTracking; }, [stopTracking]);
