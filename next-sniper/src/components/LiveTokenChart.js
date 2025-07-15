@@ -58,65 +58,35 @@ CandlestickShape.displayName = 'CandlestickShape';
 
 // --- Re-aggregation Function ---
 const aggregateHistoricalCandles = (rawTicks, intervalMs, maxCandles) => {
-    if (!rawTicks || rawTicks.length === 0) {
-        // If no data yet, return padded empty candles
-        const now = Math.floor(Date.now() / intervalMs) * intervalMs;
-        return Array.from({ length: maxCandles }, (_, i) => ({
-            timestamp: now - (maxCandles - i) * intervalMs,
-            open: null,
-            high: null,
-            low: null,
-            close: null
-        }));
-    }
+    const now = Math.floor(Date.now() / intervalMs) * intervalMs;
+    const slots = Array.from({ length: maxCandles }, (_, i) => now - (maxCandles - 1 - i) * intervalMs);
 
-    console.log(`Re-aggregating ${rawTicks.length} raw ticks into ${intervalMs/1000}s candles.`);
-    
-    const candles = new Map(); // Use Map for easier aggregation by period start time
-
-    for (const tick of rawTicks) {
-        const { timestamp, price } = tick;
-       if (typeof timestamp !== 'number' || typeof price !== 'number' || isNaN(timestamp) || isNaN(price)) continue;
-
-        const periodStart = Math.floor(timestamp / intervalMs) * intervalMs;
-
-        if (!candles.has(periodStart)) {
-            candles.set(periodStart, {
-                timestamp: periodStart,
-                open: price,
-                high: price,
-                low: price,
-                currentClose: price, // Tracks latest price within interval
-                volume: 0,
-            });
-        } else {
-            const candle = candles.get(periodStart);
-            candle.high = Math.max(candle.high, price);
-            candle.low = Math.min(candle.low, price);
-            candle.currentClose = price; // Update latest price
+        const slotMap = new Map();
+    if (Array.isArray(rawTicks)) {
+        for (const tick of rawTicks) {
+            const { timestamp, price } = tick || {};
+            if (typeof timestamp !== 'number' || typeof price !== 'number' || isNaN(timestamp) || isNaN(price)) continue;
+            const slot = Math.floor(timestamp / intervalMs) * intervalMs;
+            if (!slotMap.has(slot)) slotMap.set(slot, []);
+            slotMap.get(slot).push(price);
         }
     }
 
-    const aggregatedCandles = Array.from(candles.values()).map(candle => ({
-        ...candle,
-        close: candle.currentClose // Final close is the last price seen in the interval
-    })).sort((a, b) => a.timestamp - b.timestamp); // Ensure sorted by time
+    let prevClose = null;
+    const result = slots.map(slotTime => {
+        const prices = slotMap.get(slotTime);
+        if (prices && prices.length > 0) {
+            const open = prices[0];
+            const close = prices[prices.length - 1];
+            const high = Math.max(...prices);
+            const low = Math.min(...prices);
+            prevClose = close;
+            return { timestamp: slotTime, open, high, low, close };
+        } else {
+            return { timestamp: slotTime, open: prevClose, high: prevClose, low: prevClose, close: prevClose, isEmpty: true };
+        }
+    });
 
-    let result = aggregatedCandles.slice(-maxCandles);
-
-    if (result.length < maxCandles) {
-        const firstTimestamp = result.length > 0 ? result[0].timestamp : Math.floor(Date.now() / intervalMs) * intervalMs;
-        const paddingNeeded = maxCandles - result.length;
-        const padding = Array.from({ length: paddingNeeded }, (_, idx) => ({
-            timestamp: firstTimestamp - (paddingNeeded - idx) * intervalMs,
-            open: null,
-            high: null,
-            low: null,
-            close: null
-        }));
-        result = padding.concat(result);
-    }
-    console.log(`Re-aggregation produced ${result.length} candles.`);
     return result;
 };
 
