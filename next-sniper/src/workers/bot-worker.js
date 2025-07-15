@@ -98,6 +98,7 @@ function createTradeApi(wallet, ctx, log) {
           log('[trade] Missing poolId for Raydium sell');
           throw new Error('poolId required');
         }
+        const devPriority = await getOptimalPriorityFee(ctx.connection);
         sig = await swapRaydiumTokens(
           wallet,
           ctx.connection,
