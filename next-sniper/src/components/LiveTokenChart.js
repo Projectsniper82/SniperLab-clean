@@ -10,9 +10,11 @@ import { useChartData } from '@/context/ChartDataContext'
 // --- Constants ---
 const INITIAL_CANDLE_INTERVAL_MS = 60 * 1000; // Default to 1 minute
 const POLLING_INTERVAL_MS = 5 * 1000;       // Fetch price every 5s
-const MAX_DISPLAY_POINTS = 150;       // Max candles/points shown in main chart history
+const MAX_DISPLAY_POINTS = 150;       // Max candles/points shown in main chart
+const MAX_HISTORY_CANDLES = 200;      // Hard cap across intervals
 const MAX_RAW_TICKS = Math.max(300, (15 * 60 * 1000) / POLLING_INTERVAL_MS * 3); // Store enough raw ticks for ~45 mins (for 15m re-aggregation)
 const INITIAL_BRUSH_POINTS_VISIBLE = Math.floor(MAX_DISPLAY_POINTS * 0.6); // How many points the brush shows initially (e.g., last 60%)
+const USER_WINDOW_HOLD_MS = 30 * 1000; // Time to keep manual brush view
 
 // --- Helper Functions ---
 const formatUsd = (value, detail = false) => { 
@@ -116,6 +118,8 @@ export default function LiveTokenChart({
 
     const startTrackingRef = useRef(startTracking);
     const stopTrackingRef = useRef(stopTracking);
+    const lastBrushInteractionRef = useRef(Date.now());
+    const prevDataLenRef = useRef(0);
 
     useEffect(() => { startTrackingRef.current = startTracking; }, [startTracking]);
     useEffect(() => { stopTrackingRef.current = stopTracking; }, [stopTracking]);
@@ -132,6 +136,8 @@ export default function LiveTokenChart({
             setOhlcData([]); setCurrentCandle(null);
             const defaultEndIndex = MAX_DISPLAY_POINTS - 1;
             const defaultStartIndex = Math.max(0, defaultEndIndex - INITIAL_BRUSH_POINTS_VISIBLE + 1);
+            lastBrushInteractionRef.current = Date.now();
+            prevDataLenRef.current = 0;
             setBrushWindow({ startIndex: defaultStartIndex, endIndex: defaultEndIndex });
             startTrackingRef.current(tokenMint, connection, tokenDecimals, tokenSupply, selectedPool);
             return () => { stopTrackingRef.current(); };
@@ -142,14 +148,26 @@ export default function LiveTokenChart({
 
     useEffect(() => {
         console.log(`LiveTokenChart: Interval changed to ${selectedCandleIntervalMs / 1000}s. Re-aggregating.`);
-        const historicalCandles = aggregateHistoricalCandles(rawPriceHistory, selectedCandleIntervalMs, MAX_DISPLAY_POINTS);
+        const maxCandles = Math.min(
+            MAX_DISPLAY_POINTS,
+            MAX_HISTORY_CANDLES,
+            Math.floor((MAX_RAW_TICKS * POLLING_INTERVAL_MS) / selectedCandleIntervalMs)
+        );
+        const historicalCandles = aggregateHistoricalCandles(rawPriceHistory, selectedCandleIntervalMs, maxCandles);
         setOhlcData(historicalCandles);
         setCurrentCandle(null);
         
         const newEndIndex = Math.max(0, historicalCandles.length - 1);
         setBrushWindow(prev => {
+            const now = Date.now();
+            const atLiveEdge = prev.endIndex >= prevDataLenRef.current - 1;
+            const keepUserView = !atLiveEdge && (now - lastBrushInteractionRef.current) < USER_WINDOW_HOLD_MS;
             const windowSize = prev.endIndex - prev.startIndex;
             const newStartIndex = Math.max(0, newEndIndex - windowSize);
+            prevDataLenRef.current = historicalCandles.length;
+            if (keepUserView) {
+                return prev;
+            }
             if (prev.startIndex !== newStartIndex || prev.endIndex !== newEndIndex) {
                 return { startIndex: newStartIndex, endIndex: newEndIndex };
             }
@@ -194,12 +212,21 @@ export default function LiveTokenChart({
         return [domainMin, domainMax];
     }, [chartSourceData, chartMode, lastPrice, currentMarketCap, brushWindow]); 
 
-    const handleBrushChange = useCallback(({ startIndex, endIndex }) => { 
-        const currentDataLength = chartSourceData.length; const maxIndex = Math.max(0, currentDataLength - 1);
-        const rawStartIndex = (typeof startIndex === 'number' && !isNaN(startIndex)) ? startIndex : 0; const rawEndIndex = (typeof endIndex === 'number' && !isNaN(endIndex)) ? endIndex : maxIndex;
-        const finalStartIndex = Math.max(0, Math.min(rawStartIndex, maxIndex)); const finalEndIndex = Math.min(Math.max(finalStartIndex, rawEndIndex), maxIndex); 
-        setBrushWindow(prev => { if (prev.startIndex !== finalStartIndex || prev.endIndex !== finalEndIndex) { return { startIndex: finalStartIndex, endIndex: finalEndIndex }; } return prev; });
-    }, [chartSourceData.length]); 
+    const handleBrushChange = useCallback(({ startIndex, endIndex }) => {
+        const currentDataLength = chartSourceData.length;
+        const maxIndex = Math.max(0, currentDataLength - 1);
+        const rawStartIndex = (typeof startIndex === 'number' && !isNaN(startIndex)) ? startIndex : 0;
+        const rawEndIndex = (typeof endIndex === 'number' && !isNaN(endIndex)) ? endIndex : maxIndex;
+        const finalStartIndex = Math.max(0, Math.min(rawStartIndex, maxIndex));
+        const finalEndIndex = Math.min(Math.max(finalStartIndex, rawEndIndex), maxIndex);
+        lastBrushInteractionRef.current = Date.now();
+        setBrushWindow(prev => {
+            if (prev.startIndex !== finalStartIndex || prev.endIndex !== finalEndIndex) {
+                return { startIndex: finalStartIndex, endIndex: finalEndIndex };
+            }
+            return prev;
+        });
+    }, [chartSourceData.length]);
 
     const currentPriceForStats = currentCandle?.currentClose ?? lastPrice ?? 0;
     const displayPriceUsd = solUsdPrice !== null ? currentPriceForStats * solUsdPrice : null;
@@ -219,7 +246,20 @@ export default function LiveTokenChart({
             <ResponsiveContainer key={`<span class="math-inline">\{chartMode\}\-</span>{selectedCandleIntervalMs}`} width="100%" height={420}> 
                 <ComposedChart data={chartSourceData} margin={{ top: 5, right: 5, left: -20, bottom: 60 }}> 
                     <CartesianGrid stroke="#303030" strokeDasharray="3 3" />
-                    <XAxis dataKey="timestamp" type="category" tickFormatter={formatTime} tick={{ fill: '#888', fontSize: 9, angle: -40 }} axisLine={{ stroke: '#444' }} dy={15} dx={-10} interval={0} minTickGap={0} textAnchor="end" height={45} />
+                    <XAxis
+                        dataKey="timestamp"
+                        type="category"
+                        tickFormatter={formatTime}
+                        tick={{ fill: '#888', fontSize: 9, angle: -40 }}
+                        axisLine={{ stroke: '#444' }}
+                        dy={15}
+                        dx={-10}
+                        interval={Math.max(0, Math.ceil((validEndIndex - validStartIndex + 1) / 6) - 1)}
+                        allowDuplicatedCategory={false}
+                        minTickGap={0}
+                        textAnchor="end"
+                        height={45}
+                    />
                     <YAxis yAxisId="primary" domain={yAxisDomain} axisLine={{ stroke: '#444' }} tick={chartMode === 'price' ? <DexStylePriceTick /> : { fill: '#888', fontSize: 10 }} tickFormatter={chartMode !== 'price' ? defaultTickFormatter : undefined} orientation="left" scale={chartMode === 'price' ? "log" : "linear"} allowDataOverflow={false} dx={-2} width={55} />
                     <Tooltip formatter={(value, name, entry) => { const { payload } = entry; if (chartMode === 'price' && payload && typeof payload.open !== 'undefined') { const usdO = solUsdPrice !== null ? formatUsd(payload.open * solUsdPrice, true) : 'N/A'; const usdH = solUsdPrice !== null ? formatUsd(payload.high * solUsdPrice, true) : 'N/A'; const usdL = solUsdPrice !== null ? formatUsd(payload.low * solUsdPrice, true) : 'N/A'; const usdC = solUsdPrice !== null ? formatUsd(payload.close * solUsdPrice, true) : 'N/A'; const formattedValue = `O: <span class="math-inline">\{payload\.open\.toPrecision\(6\)\} \(</span>{usdO})\nH: <span class="math-inline">\{payload\.high\.toPrecision\(6\)\} \(</span>{usdH})\nL: <span class="math-inline">\{payload\.low\.toPrecision\(6\)\} \(</span>{usdL})\nC: <span class="math-inline">\{payload\.close\.toPrecision\(6\)\} \(</span>{usdC})`; return [formattedValue, name]; } else if (chartMode === 'marketCap' && name === 'Market Cap') { const usdVal = solUsdPrice !== null ? formatUsd(value * solUsdPrice) : ''; return [`${defaultTickFormatter(value)} SOL ${usdVal}`, "Market Cap"]; } const fallbackUsd = (typeof value === 'number' && solUsdPrice !== null) ? formatUsd(value * solUsdPrice) : ''; return [`${value} ${fallbackUsd}`, name]; }} labelFormatter={(label) => new Date(label).toLocaleString()} contentStyle={{ backgroundColor: 'rgba(30, 30, 30, 0.9)', borderColor: '#555', borderRadius: '4px', padding: '8px 12px', whiteSpace: 'pre-line' }} itemStyle={{ color: '#eee', fontSize: '11px', padding: '1px 0'}} labelStyle={{ color: '#fff', fontSize: '12px', marginBottom: '5px', fontWeight: 'bold'}} cursor={{fill: 'rgba(200, 200, 200, 0.1)'}} position={{ y: 10 }} />
                     {chartMode === 'price' && currentPriceForStats > 0 && ( <ReferenceLine y={currentPriceForStats} yAxisId="primary" stroke="#4CAF50" strokeDasharray="4 4" strokeOpacity={0.8}> <text x="calc(100% - 50px)" y="10" fill="#4CAF50" fontSize="10" textAnchor="middle">{currentPriceForStats.toPrecision(4)}</text> </ReferenceLine> )}
