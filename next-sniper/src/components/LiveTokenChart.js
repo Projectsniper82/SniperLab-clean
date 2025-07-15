@@ -61,7 +61,7 @@ const aggregateHistoricalCandles = (rawTicks, intervalMs, maxCandles) => {
     const now = Math.floor(Date.now() / intervalMs) * intervalMs;
     const slots = Array.from({ length: maxCandles }, (_, i) => now - (maxCandles - 1 - i) * intervalMs);
 
-        const slotMap = new Map();
+    const slotMap = new Map();
     if (Array.isArray(rawTicks)) {
         for (const tick of rawTicks) {
             const { timestamp, price } = tick || {};
@@ -72,19 +72,20 @@ const aggregateHistoricalCandles = (rawTicks, intervalMs, maxCandles) => {
         }
     }
 
-    let prevClose = null;
+    // Seed previous close with the earliest known price so initial empty
+    // intervals are rendered as flat candles instead of being discarded
+    let prevClose = Array.isArray(rawTicks) && rawTicks.length > 0 ? rawTicks[0].price : null;
     const result = slots.map(slotTime => {
         const prices = slotMap.get(slotTime);
         if (prices && prices.length > 0) {
-            const open = prices[0];
+            const open = prevClose;
             const close = prices[prices.length - 1];
-            const high = Math.max(...prices);
-            const low = Math.min(...prices);
+            const high = Math.max(open, ...prices);
+            const low = Math.min(open, ...prices);
             prevClose = close;
             return { timestamp: slotTime, open, high, low, close };
-        } else {
-            return { timestamp: slotTime, open: prevClose, high: prevClose, low: prevClose, close: prevClose, isEmpty: true };
         }
+        return { timestamp: slotTime, open: prevClose, high: prevClose, low: prevClose, close: prevClose, isEmpty: true };
     });
 
     return result;
@@ -156,9 +157,18 @@ export default function LiveTokenChart({
         });
     }, [selectedCandleIntervalMs, rawPriceHistory]);
 
-    const chartSourceData = useMemo(() => { 
-        if (chartMode === 'price') { const data = [...ohlcData]; if (currentCandle) { data.push({ ...currentCandle, close: currentCandle.currentClose }); } return data.filter(c => c && typeof c.timestamp === 'number' && typeof c.open === 'number').map((c, index) => ({...c, key: `ohlc-<span class="math-inline">\{c\.timestamp\}\-</span>{index}`})); } 
-        else { return marketCapHistory.filter(mc => mc && typeof mc.timestamp === 'number' && typeof mc.marketCap === 'number').map((mc, index) => ({...mc, key: `mc-<span class="math-inline">\{mc\.timestamp\}\-</span>{index}`})); } 
+    const chartSourceData = useMemo(() => {
+        if (chartMode === "price") {
+            const data = [...ohlcData];
+            if (currentCandle) {
+                data.push({ ...currentCandle, close: currentCandle.currentClose });
+            }
+            return data.filter(c => c && typeof c.timestamp === "number")
+                       .map((c, index) => ({ ...c, key: `ohlc-${c.timestamp}-${index}` }));
+        }
+        return marketCapHistory
+            .filter(mc => mc && typeof mc.timestamp === "number" && typeof mc.marketCap === "number")
+            .map((mc, index) => ({ ...mc, key: `mc-${mc.timestamp}-${index}` }));
     }, [ohlcData, currentCandle, marketCapHistory, chartMode]);
 
     const yAxisDomain = useMemo(() => { 
