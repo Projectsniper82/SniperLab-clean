@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import {
-  ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine,
- ResponsiveContainer, Scatter, Line, Area, Brush 
+  ComposedChart, XAxis, YAxis, Tooltip, ReferenceLine,
+ ResponsiveContainer, Scatter, Line, Area, Brush
 } from 'recharts'
 import { useChartData } from '@/context/ChartDataContext'
 
@@ -49,7 +49,7 @@ DexStylePriceTick.displayName = 'DexStylePriceTick';
 const CandlestickShape = React.memo((props) => { 
   const { x, payload, yAxis, width: candleSlotWidth } = props; 
   if (typeof x !== 'number' || isNaN(x)) { return null; }
-  if (!payload || typeof payload.open === 'undefined' || !yAxis || typeof yAxis.scale !== 'function' || !candleSlotWidth || candleSlotWidth <= 0 || isNaN(candleSlotWidth)) { return null; }
+  if (!payload || payload.open == null || payload.high == null || payload.low == null || payload.close == null || !yAxis || typeof yAxis.scale !== 'function' || !candleSlotWidth || candleSlotWidth <= 0 || isNaN(candleSlotWidth)) { return null; }
   const scale = yAxis.scale; const yHigh = typeof payload.high === 'number' ? scale(payload.high) : NaN; const yLow = typeof payload.low === 'number' ? scale(payload.low) : NaN; const yOpen = typeof payload.open === 'number' ? scale(payload.open) : NaN; const yClose = typeof payload.close === 'number' ? scale(payload.close) : NaN;
   if ([yHigh, yLow, yOpen, yClose].some(val => isNaN(val))) { return null; }
   const isGreen = payload.close >= payload.open; const color = isGreen ? '#26A69A' : '#EF5350'; const bodyY = Math.min(yOpen, yClose); const bodyHeight = Math.max(1, Math.abs(yOpen - yClose)); const candleActualWidth = Math.max(1, candleSlotWidth * 0.7); const xCoord = x + (candleSlotWidth - candleActualWidth) / 2; 
@@ -74,8 +74,7 @@ const aggregateHistoricalCandles = (rawTicks, intervalMs, maxCandles) => {
         }
     }
 
-    // Seed previous close with the earliest known price so initial empty
-    // intervals are rendered as flat candles instead of being discarded
+   // Track previous close to derive the next candle's open when data exists
     let prevClose = Array.isArray(rawTicks) && rawTicks.length > 0 ? rawTicks[0].price : null;
     const result = slots.map(slotTime => {
         const prices = slotMap.get(slotTime);
@@ -87,7 +86,7 @@ const aggregateHistoricalCandles = (rawTicks, intervalMs, maxCandles) => {
             prevClose = close;
             return { timestamp: slotTime, open, high, low, close };
         }
-        return { timestamp: slotTime, open: prevClose, high: prevClose, low: prevClose, close: prevClose, isEmpty: true };
+        return null;
     });
 
     return result;
@@ -181,8 +180,12 @@ export default function LiveTokenChart({
             if (currentCandle) {
                 data.push({ ...currentCandle, close: currentCandle.currentClose });
             }
-            return data.filter(c => c && typeof c.timestamp === "number")
-                       .map((c, index) => ({ ...c, key: `ohlc-${c.timestamp}-${index}` }));
+           return data.map((c, index) => {
+                if (c && typeof c.timestamp === "number") {
+                    return { ...c, key: `ohlc-${c.timestamp}-${index}` };
+                }
+                return null;
+            });
         }
         return marketCapHistory
             .filter(mc => mc && typeof mc.timestamp === "number" && typeof mc.marketCap === "number")
@@ -199,8 +202,19 @@ export default function LiveTokenChart({
         if (!visibleData || visibleData.length === 0) return ['auto', 'auto'];
         
         let minVal = Infinity; let maxVal = 0;
-        if (chartMode === 'price') { visibleData.forEach(d => { if (d.low > 0) minVal = Math.min(minVal, d.low); if (d.high > 0) maxVal = Math.max(maxVal, d.high); }); } 
-        else { visibleData.forEach(d => { if (d.marketCap > 0) minVal = Math.min(minVal, d.marketCap); if (d.marketCap > 0) maxVal = Math.max(maxVal, d.marketCap); }); }
+       if (chartMode === 'price') {
+            visibleData.forEach(d => {
+                if (!d) return;
+                if (d.low > 0) minVal = Math.min(minVal, d.low);
+                if (d.high > 0) maxVal = Math.max(maxVal, d.high);
+            });
+        } else {
+            visibleData.forEach(d => {
+                if (!d) return;
+                if (d.marketCap > 0) minVal = Math.min(minVal, d.marketCap);
+                if (d.marketCap > 0) maxVal = Math.max(maxVal, d.marketCap);
+            });
+        }
         
         if (minVal === Infinity || maxVal === 0) { const fallbackLast = chartMode === 'price' ? lastPrice : currentMarketCap; if (fallbackLast > 0) return [fallbackLast * 0.5, fallbackLast * 1.5]; return chartMode === 'price' ? [0.00000001, 0.000001] : [1, 1000]; }
         
@@ -243,9 +257,8 @@ export default function LiveTokenChart({
         const validEndIndex = Math.max(validStartIndex, Math.min(brushWindow.endIndex, currentDataLen - 1));
 
         return (
-            <ResponsiveContainer key={`<span class="math-inline">\{chartMode\}\-</span>{selectedCandleIntervalMs}`} width="100%" height={420}> 
-                <ComposedChart data={chartSourceData} margin={{ top: 5, right: 5, left: -20, bottom: 60 }}> 
-                    <CartesianGrid stroke="#303030" strokeDasharray="3 3" />
+            <ResponsiveContainer key={`<span class="math-inline">\{chartMode\}\-</span>{selectedCandleIntervalMs}`} width="100%" height={420} style={{ backgroundColor: '#000' }}> 
+                <ComposedChart data={chartSourceData} margin={{ top: 5, right: 5, left: -20, bottom: 60 }}>
                     <XAxis
                         dataKey="timestamp"
                         type="category"
