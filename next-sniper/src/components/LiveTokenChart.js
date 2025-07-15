@@ -58,14 +58,25 @@ CandlestickShape.displayName = 'CandlestickShape';
 
 // --- Re-aggregation Function ---
 const aggregateHistoricalCandles = (rawTicks, intervalMs, maxCandles) => {
-    if (!rawTicks || rawTicks.length === 0) return [];
+    if (!rawTicks || rawTicks.length === 0) {
+        // If no data yet, return padded empty candles
+        const now = Math.floor(Date.now() / intervalMs) * intervalMs;
+        return Array.from({ length: maxCandles }, (_, i) => ({
+            timestamp: now - (maxCandles - i) * intervalMs,
+            open: null,
+            high: null,
+            low: null,
+            close: null
+        }));
+    }
+
     console.log(`Re-aggregating ${rawTicks.length} raw ticks into ${intervalMs/1000}s candles.`);
     
     const candles = new Map(); // Use Map for easier aggregation by period start time
 
     for (const tick of rawTicks) {
         const { timestamp, price } = tick;
-        if (typeof timestamp !== 'number' || typeof price !== 'number' || isNaN(timestamp) || isNaN(price)) continue; 
+       if (typeof timestamp !== 'number' || typeof price !== 'number' || isNaN(timestamp) || isNaN(price)) continue;
 
         const periodStart = Math.floor(timestamp / intervalMs) * intervalMs;
 
@@ -76,7 +87,7 @@ const aggregateHistoricalCandles = (rawTicks, intervalMs, maxCandles) => {
                 high: price,
                 low: price,
                 currentClose: price, // Tracks latest price within interval
-                volume: 0, 
+                volume: 0,
             });
         } else {
             const candle = candles.get(periodStart);
@@ -91,7 +102,20 @@ const aggregateHistoricalCandles = (rawTicks, intervalMs, maxCandles) => {
         close: candle.currentClose // Final close is the last price seen in the interval
     })).sort((a, b) => a.timestamp - b.timestamp); // Ensure sorted by time
 
-    const result = aggregatedCandles.slice(-maxCandles);
+    let result = aggregatedCandles.slice(-maxCandles);
+
+    if (result.length < maxCandles) {
+        const firstTimestamp = result.length > 0 ? result[0].timestamp : Math.floor(Date.now() / intervalMs) * intervalMs;
+        const paddingNeeded = maxCandles - result.length;
+        const padding = Array.from({ length: paddingNeeded }, (_, idx) => ({
+            timestamp: firstTimestamp - (paddingNeeded - idx) * intervalMs,
+            open: null,
+            high: null,
+            low: null,
+            close: null
+        }));
+        result = padding.concat(result);
+    }
     console.log(`Re-aggregation produced ${result.length} candles.`);
     return result;
 };
@@ -152,8 +176,14 @@ export default function LiveTokenChart({
         setCurrentCandle(null);
         
         const newEndIndex = Math.max(0, historicalCandles.length - 1);
-        const newStartIndex = Math.max(0, newEndIndex - INITIAL_BRUSH_POINTS_VISIBLE + 1); 
-        setBrushWindow({ startIndex: newStartIndex, endIndex: newEndIndex });
+        setBrushWindow(prev => {
+            const windowSize = prev.endIndex - prev.startIndex;
+            const newStartIndex = Math.max(0, newEndIndex - windowSize);
+            if (prev.startIndex !== newStartIndex || prev.endIndex !== newEndIndex) {
+                return { startIndex: newStartIndex, endIndex: newEndIndex };
+            }
+            return prev;
+        });
     }, [selectedCandleIntervalMs, rawPriceHistory]);
 
     const chartSourceData = useMemo(() => { 
@@ -209,7 +239,7 @@ export default function LiveTokenChart({
             <ResponsiveContainer key={`<span class="math-inline">\{chartMode\}\-</span>{selectedCandleIntervalMs}`} width="100%" height={420}> 
                 <ComposedChart data={chartSourceData} margin={{ top: 5, right: 5, left: -20, bottom: 60 }}> 
                     <CartesianGrid stroke="#303030" strokeDasharray="3 3" />
-                    <XAxis dataKey="timestamp" type="number" scale="time" domain={['dataMin', 'dataMax']} tickFormatter={formatTime} tick={{ fill: '#888', fontSize: 9, angle: -40 }} axisLine={{ stroke: '#444' }} dy={15} dx={-10} interval="auto" minTickGap={80} textAnchor="end" height={45} />
+                    <XAxis dataKey="timestamp" type="category" tickFormatter={formatTime} tick={{ fill: '#888', fontSize: 9, angle: -40 }} axisLine={{ stroke: '#444' }} dy={15} dx={-10} interval={0} minTickGap={0} textAnchor="end" height={45} />
                     <YAxis yAxisId="primary" domain={yAxisDomain} axisLine={{ stroke: '#444' }} tick={chartMode === 'price' ? <DexStylePriceTick /> : { fill: '#888', fontSize: 10 }} tickFormatter={chartMode !== 'price' ? defaultTickFormatter : undefined} orientation="left" scale={chartMode === 'price' ? "log" : "linear"} allowDataOverflow={false} dx={-2} width={55} />
                     <Tooltip formatter={(value, name, entry) => { const { payload } = entry; if (chartMode === 'price' && payload && typeof payload.open !== 'undefined') { const usdO = solUsdPrice !== null ? formatUsd(payload.open * solUsdPrice, true) : 'N/A'; const usdH = solUsdPrice !== null ? formatUsd(payload.high * solUsdPrice, true) : 'N/A'; const usdL = solUsdPrice !== null ? formatUsd(payload.low * solUsdPrice, true) : 'N/A'; const usdC = solUsdPrice !== null ? formatUsd(payload.close * solUsdPrice, true) : 'N/A'; const formattedValue = `O: <span class="math-inline">\{payload\.open\.toPrecision\(6\)\} \(</span>{usdO})\nH: <span class="math-inline">\{payload\.high\.toPrecision\(6\)\} \(</span>{usdH})\nL: <span class="math-inline">\{payload\.low\.toPrecision\(6\)\} \(</span>{usdL})\nC: <span class="math-inline">\{payload\.close\.toPrecision\(6\)\} \(</span>{usdC})`; return [formattedValue, name]; } else if (chartMode === 'marketCap' && name === 'Market Cap') { const usdVal = solUsdPrice !== null ? formatUsd(value * solUsdPrice) : ''; return [`${defaultTickFormatter(value)} SOL ${usdVal}`, "Market Cap"]; } const fallbackUsd = (typeof value === 'number' && solUsdPrice !== null) ? formatUsd(value * solUsdPrice) : ''; return [`${value} ${fallbackUsd}`, name]; }} labelFormatter={(label) => new Date(label).toLocaleString()} contentStyle={{ backgroundColor: 'rgba(30, 30, 30, 0.9)', borderColor: '#555', borderRadius: '4px', padding: '8px 12px', whiteSpace: 'pre-line' }} itemStyle={{ color: '#eee', fontSize: '11px', padding: '1px 0'}} labelStyle={{ color: '#fff', fontSize: '12px', marginBottom: '5px', fontWeight: 'bold'}} cursor={{fill: 'rgba(200, 200, 200, 0.1)'}} position={{ y: 10 }} />
                     {chartMode === 'price' && currentPriceForStats > 0 && ( <ReferenceLine y={currentPriceForStats} yAxisId="primary" stroke="#4CAF50" strokeDasharray="4 4" strokeOpacity={0.8}> <text x="calc(100% - 50px)" y="10" fill="#4CAF50" fontSize="10" textAnchor="middle">{currentPriceForStats.toPrecision(4)}</text> </ReferenceLine> )}
@@ -231,7 +261,7 @@ export default function LiveTokenChart({
                           fill="rgba(60, 60, 60, 0.5)"
                         >
                           <ComposedChart> 
-                              <XAxis dataKey="timestamp" hide /> 
+                              <XAxis dataKey="timestamp" type="category" hide />
                                {chartMode === 'price' ? ( <Line type="monotone" dataKey="close" stroke="#777" dot={false} isAnimationActive={false} yAxisId="brushY" /> ) 
                                : ( <Area type="monotone" dataKey="marketCap" stroke="#777" fill="#666" fillOpacity={0.3} dot={false} isAnimationActive={false} yAxisId="brushY"/> )}
                               <YAxis hide domain={yAxisDomain} yAxisId="brushY" scale={chartMode === 'price' ? "log" : "linear"}/>
