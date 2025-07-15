@@ -96,10 +96,18 @@ const aggregateHistoricalCandles = (rawTicks, intervalMs, maxCandles) => {
 export default function LiveTokenChart({
   tokenMint, tokenDecimals, tokenSupply, connection, selectedPool, network
 }) {
+     const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  if (!hasMounted) {
+    return <div style={{ width: '100%', height: 420, backgroundColor: '#000' }} />;
+  }
     const [selectedCandleIntervalMs, setSelectedCandleIntervalMs] = useState(INITIAL_CANDLE_INTERVAL_MS);
     const [chartMode, setChartMode] = useState('price'); 
     const [ohlcData, setOhlcData] = useState([]);
-   const [currentCandle, setCurrentCandle] = useState(null);
+    const [currentCandle, setCurrentCandle] = useState(null);
 
     const {
         rawPriceHistory,
@@ -117,11 +125,16 @@ export default function LiveTokenChart({
 
     const startTrackingRef = useRef(startTracking);
     const stopTrackingRef = useRef(stopTracking);
-    const lastBrushInteractionRef = useRef(Date.now());
+    const lastBrushInteractionRef = useRef(0);
     const prevDataLenRef = useRef(0);
 
     useEffect(() => { startTrackingRef.current = startTracking; }, [startTracking]);
     useEffect(() => { stopTrackingRef.current = stopTracking; }, [stopTracking]);
+     useEffect(() => {
+        if (hasMounted) {
+            lastBrushInteractionRef.current = Date.now();
+        }
+    }, [hasMounted]);
   
     const initialBrushEndIndex = MAX_DISPLAY_POINTS - 1;
     const initialBrushStartIndex = Math.max(0, initialBrushEndIndex - INITIAL_BRUSH_POINTS_VISIBLE + 1);
@@ -130,7 +143,8 @@ export default function LiveTokenChart({
         endIndex: initialBrushEndIndex 
     });
 
-    useEffect(() => { 
+    useEffect(() => {
+        if (!hasMounted) return;
         if (tokenMint && tokenDecimals !== undefined && tokenDecimals !== null) {
             setOhlcData([]); setCurrentCandle(null);
             const defaultEndIndex = MAX_DISPLAY_POINTS - 1;
@@ -146,6 +160,7 @@ export default function LiveTokenChart({
     }, [tokenMint, tokenDecimals, connection, tokenSupply, selectedPool]);
 
     useEffect(() => {
+         if (!hasMounted) return;
         console.log(`LiveTokenChart: Interval changed to ${selectedCandleIntervalMs / 1000}s. Re-aggregating.`);
         const maxCandles = Math.min(
             MAX_DISPLAY_POINTS,
@@ -172,7 +187,7 @@ export default function LiveTokenChart({
             }
             return prev;
         });
-    }, [selectedCandleIntervalMs, rawPriceHistory]);
+    }, [hasMounted, selectedCandleIntervalMs, rawPriceHistory])
 
     const chartSourceData = useMemo(() => {
         if (chartMode === "price") {
@@ -227,6 +242,7 @@ export default function LiveTokenChart({
     }, [chartSourceData, chartMode, lastPrice, currentMarketCap, brushWindow]); 
 
     const handleBrushChange = useCallback(({ startIndex, endIndex }) => {
+        if (!hasMounted) return;
         const currentDataLength = chartSourceData.length;
         const maxIndex = Math.max(0, currentDataLength - 1);
         const rawStartIndex = (typeof startIndex === 'number' && !isNaN(startIndex)) ? startIndex : 0;
@@ -240,7 +256,7 @@ export default function LiveTokenChart({
             }
             return prev;
         });
-    }, [chartSourceData.length]);
+   }, [hasMounted, chartSourceData.length]);
 
     const currentPriceForStats = currentCandle?.currentClose ?? lastPrice ?? 0;
     const displayPriceUsd = solUsdPrice !== null ? currentPriceForStats * solUsdPrice : null;
