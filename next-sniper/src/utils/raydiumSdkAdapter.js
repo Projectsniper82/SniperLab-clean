@@ -643,15 +643,22 @@ export const swapRaydiumTokens = async (
        }
 
         // --- Step 8: Get User ATA Addresses ---
-        console.log('[vXX Log Step 8] Getting user ATA addresses and collecting setup instructions...');
+       console.log('[vXX Log Step 8] Getting user ATA addresses and collecting setup instructions...');
         const setupInstructions = [];
+        const cleanupInstructions = [];
         let userSourceAta;
         let userDestAta;
         if (baseIn) {
             console.log(`[vXX Log Step 8] Buy swap (SOL -> Token). Input is Base.`);
-            const { address: wsolAta, instructions: wsolInstructions } = await getWSOLAccountAndInstructions(connection, ownerPublicKey, amountInBN);
+            const wsolAta = await getAssociatedTokenAddress(NATIVE_MINT, ownerPublicKey, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
+            const wsolInfo = await connection.getAccountInfo(wsolAta);
+            if (!wsolInfo) {
+                setupInstructions.push(createAssociatedTokenAccountInstruction(ownerPublicKey, wsolAta, ownerPublicKey, NATIVE_MINT, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID));
+            }
+            setupInstructions.push(SystemProgram.transfer({ fromPubkey: ownerPublicKey, toPubkey: wsolAta, lamports: amountInBN }));
+            setupInstructions.push(createSyncNativeInstruction(wsolAta, TOKEN_PROGRAM_ID));
+            cleanupInstructions.push(createCloseAccountInstruction(wsolAta, ownerPublicKey, ownerPublicKey, [], TOKEN_PROGRAM_ID));
             userSourceAta = wsolAta;
-            if (wsolInstructions) setupInstructions.push(...wsolInstructions);
             const { address: tokenAta, instruction: tokenCreateInstruction } = await getAtaAddressAndCreateInstruction(connection, ownerPublicKey, outputMintPk.toBase58());
             userDestAta = tokenAta;
             if (tokenCreateInstruction) setupInstructions.push(tokenCreateInstruction);
@@ -660,11 +667,15 @@ export const swapRaydiumTokens = async (
             const { address: tokenAta, instruction: tokenCreateInstruction } = await getAtaAddressAndCreateInstruction(connection, ownerPublicKey, inputMintPk.toBase58());
             userSourceAta = tokenAta;
             if (tokenCreateInstruction) setupInstructions.push(tokenCreateInstruction);
-            const { address: wsolAta, instruction: wsolCreateInstruction } = await getWSOLAccountAndInstructions(connection, ownerPublicKey, new BN(0));
+            const wsolAta = await getAssociatedTokenAddress(NATIVE_MINT, ownerPublicKey, false, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
+            const wsolInfo = await connection.getAccountInfo(wsolAta);
+            if (!wsolInfo) {
+                setupInstructions.push(createAssociatedTokenAccountInstruction(ownerPublicKey, wsolAta, ownerPublicKey, NATIVE_MINT, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID));
+            }
+            cleanupInstructions.push(createCloseAccountInstruction(wsolAta, ownerPublicKey, ownerPublicKey, [], TOKEN_PROGRAM_ID));
             userDestAta = wsolAta;
-            if (wsolCreateInstruction) setupInstructions.push(wsolCreateInstruction);
         }
-        console.log(`[vXX Log Step 8] Determined ATAs - Source: ${userSourceAta?.toBase58()}, Dest: ${userDestAta?.toBase58()}. Collected ${setupInstructions.length} setup instructions.`);
+        console.log(`[vXX Log Step 8] Determined ATAs - Source: ${userSourceAta?.toBase58()}, Dest: ${userDestAta?.toBase58()}. Collected ${setupInstructions.length} setup instructions, ${cleanupInstructions.length} cleanup instructions.`);
 
         // --- Step 9: Prepare the Swap Instruction ---
         console.log('[vXX Log Step 9] Preparing swap instruction...');
@@ -692,30 +703,19 @@ export const swapRaydiumTokens = async (
         transaction.feePayer = ownerPublicKey;
         transaction.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 800000 }));
         transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50000 }));
-        if (setupInstructions.length > 0) {
+ if (setupInstructions.length > 0) {
             transaction.add(...setupInstructions);
         }
         transaction.add(swapInstruction);
+        if (cleanupInstructions.length > 0) {
+            transaction.add(...cleanupInstructions);
+        }
         const { blockhash } = await connection.getLatestBlockhash('confirmed');
         transaction.recentBlockhash = blockhash;
         console.log('[vXX Log Step 10] Signing and sending bundled transaction via standardized helper...');
         const swapTxId = await signAndSendTransaction(connection, wallet, transaction);
         console.log(`[vXX Log Step 10] ✅ Bundled Swap Transaction Sent! TxID: ${swapTxId}`);
-
-        // --- Step 11: Handle WSOL Unwrap ---
-        if (!baseIn) {
-            console.log(`[vXX Log Step 11] Sell swap detected (Token -> WSOL). Preparing to unwrap WSOL...`);
-            console.log('[vXX Log Step 11] Waiting 5 seconds before attempting unwrap...');
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            try {
-                console.log('[vXX Log Step 11] Calling unwrapWsol function...');
-            } catch (unwrapError) {
-                console.error(`[vXX Log Step 11] ❌ Failed to unwrap WSOL after sell swap!`, unwrapError);
-            }
-        } else {
-            console.log('[vXX Log Step 11] Buy swap detected (SOL -> Token). No WSOL unwrap needed.');
-        }
-        console.log(`[vXX Log Step 12] ---> swapRaydiumTokens: End`);
+        console.log(`[vXX Log Step 11] ---> swapRaydiumTokens: End`);
         return swapTxId;
     } catch (error) {
         console.error(`[vXX Log Final Catch] ---> Swap Failed in vXX`, error);
