@@ -129,6 +129,10 @@ export default function LiveTokenChart({
     const lastBrushInteractionRef = useRef(0);
     const prevDataLenRef = useRef(0);
 
+     useEffect(() => {
+        setHasMounted(true);
+    }, []);
+
     useEffect(() => { startTrackingRef.current = startTracking; }, [startTracking]);
     useEffect(() => { stopTrackingRef.current = stopTracking; }, [stopTracking]);
      useEffect(() => {
@@ -258,6 +262,10 @@ export default function LiveTokenChart({
             return prev;
         });
    }, [hasMounted, chartSourceData.length]);
+
+if (!hasMounted) {
+        return <div style={{ width: '100%', height: 420, backgroundColor: '#000' }} />;
+    }
 
     const currentPriceForStats = currentCandle?.currentClose ?? lastPrice ?? 0;
     const displayPriceUsd = solUsdPrice !== null ? currentPriceForStats * solUsdPrice : null;
