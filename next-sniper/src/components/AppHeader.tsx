@@ -1,7 +1,16 @@
 'use client';
 import React from 'react';
 import Link from 'next/link';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import dynamic from 'next/dynamic';
+
+// WalletMultiButton relies on browser APIs that aren't available during
+// server-side rendering. Dynamically import it with SSR disabled to
+// prevent hydration mismatches.
+const WalletMultiButton = dynamic(
+  () =>
+    import('@solana/wallet-adapter-react-ui').then((mod) => mod.WalletMultiButton),
+  { ssr: false }
+);
 import { useNetwork, NetworkType } from '@/context/NetworkContext';
 
 interface AppHeaderProps {
