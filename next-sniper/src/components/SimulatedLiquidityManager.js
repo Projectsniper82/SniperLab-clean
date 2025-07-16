@@ -29,6 +29,7 @@ import {
     createRaydiumPool,
     // isRaydiumPool // We can determine if it's a Raydium pool by checking specific fields like raydiumPoolId
 } from '../utils/raydiumSdkAdapter';
+import { getOptimalPriorityFee } from '../utils/priorityFee';
 
 // Configure Decimal.js
 Decimal.set({ precision: 50 });
@@ -275,7 +276,16 @@ function SimulatedLiquidityManager({
                     return;
                 }
                 console.log("[SimulatedLiquidityManager] Creating ON-CHAIN Raydium pool (Devnet)...");
-                result = await createRaydiumPool(wallet, connection, tokenAddress, tokenDecimals, rawTokenAmountToSend, solLamportsBN);
+                const priorityFee = await getOptimalPriorityFee(connection);
+                result = await createRaydiumPool(
+                    wallet,
+                    connection,
+                    tokenAddress,
+                    tokenDecimals,
+                    rawTokenAmountToSend,
+                    solLamportsBN,
+                    priorityFee,
+                );
             } else {
                 console.log("[SimulatedLiquidityManager] Creating SIMULATED pool...");
                 result = await createSimulatedLiquidityPool(wallet, tokenAddress, tokenDecimals, rawTokenAmountToSend, solLamportsBN, subtractBalances);

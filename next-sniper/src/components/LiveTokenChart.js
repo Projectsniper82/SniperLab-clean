@@ -42,8 +42,8 @@ const defaultTickFormatter = (v) => {
 };
 
 // --- Custom Tick Component ---
-const DexStylePriceTick = React.memo((props) => { 
-    const { x, y, payload, textAnchor = "end", fill = "#888", fontSize = 10 } = props;
+const DexStylePriceTick = React.memo((props) => {
+    const { x, y, payload, textAnchor = "end", fill = "#ddd", fontSize = 10 } = props;
     const { value } = payload;
     if (typeof value !== 'number' || isNaN(value)) return null;
     let formattedTick = ''; const threshold = 0.001;
@@ -170,6 +170,9 @@ export default function LiveTokenChart({
             startTrackingRef.current(tokenMint, connection, tokenDecimals, tokenSupply, selectedPool);
             return () => { stopTrackingRef.current(); };
         } else {
+            setOhlcData([]);
+            setCurrentCandle(null);
+            prevDataLenRef.current = 0;
             stopTrackingRef.current();
         }
     }, [tokenMint, tokenDecimals, connection, tokenSupply, selectedPool]);
@@ -292,9 +295,11 @@ if (!hasMounted) {
                     <XAxis
                         dataKey="index"
                         type="number"
+                        domain={[0, MAX_DISPLAY_POINTS - 1]}
                         tickFormatter={(v)=>{const item=chartSourceData.find(d=>d.index===v);return item?formatTime(item.timestamp):""}}
                         tick={{ fill: '#888', fontSize: 9, angle: -40 }}
                         axisLine={{ stroke: '#444' }}
+                        tickLine={{ stroke: '#444' }}
                         dy={15}
                         dx={-10}
                         interval={Math.max(0, Math.ceil((validEndIndex - validStartIndex + 1) / 6) - 1)}
@@ -308,7 +313,8 @@ if (!hasMounted) {
                         yAxisId="primary"
                         domain={yAxisDomain}
                         axisLine={{ stroke: '#444' }}
-                        tick={chartMode === 'price' ? <DexStylePriceTick /> : { fill: '#888', fontSize: 10 }}
+                        tickLine={{ stroke: '#444' }}
+                        tick={chartMode === 'price' ? <DexStylePriceTick fill="#ddd" /> : { fill: '#888', fontSize: 10 }}
                         tickFormatter={chartMode !== 'price' ? defaultTickFormatter : undefined}
                         orientation="left"
                         scale={chartMode === 'price' ? "log" : "linear"}

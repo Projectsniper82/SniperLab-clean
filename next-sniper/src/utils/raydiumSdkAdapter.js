@@ -293,7 +293,13 @@ export const getWSOLAccountAndInstructions = async (connection, ownerPublicKey, 
 
 // --- Create Raydium Liquidity Pool ---
 export const createRaydiumPool = async (
-    wallet, connection, tokenAddress, tokenDecimals, tokenAmountBN, solLamportsBN
+    wallet,
+    connection,
+    tokenAddress,
+    tokenDecimals,
+    tokenAmountBN,
+    solLamportsBN,
+    priorityFeeMicroLamports = 50000,
 ) => {
     console.log('[CreatePool vXX] Starting (Bundled TX)...');
     const startTime = new BN(Math.floor(Date.now() / 1000));
@@ -347,7 +353,9 @@ export const createRaydiumPool = async (
         const transaction = new Transaction();
         transaction.feePayer = ownerPublicKey;
         transaction.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 800000 }));
-        transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50000 }));
+        transaction.add(
+            ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFeeMicroLamports })
+        );
         if (setupInstructions.length > 0) {
             transaction.add(...setupInstructions);
         }
@@ -702,7 +710,9 @@ export const swapRaydiumTokens = async (
         const transaction = new Transaction();
         transaction.feePayer = ownerPublicKey;
         transaction.add(ComputeBudgetProgram.setComputeUnitLimit({ units: 800000 }));
-        transaction.add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50000 }));
+        transaction.add(
+            ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFeeMicroLamports })
+        );
  if (setupInstructions.length > 0) {
             transaction.add(...setupInstructions);
         }
