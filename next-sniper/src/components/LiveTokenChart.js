@@ -13,10 +13,16 @@ const POLLING_INTERVAL_MS = 5 * 1000;       // Fetch price every 5s
 const MAX_DISPLAY_POINTS = 150;       // Max candles/points shown in main chart
 const MAX_HISTORY_CANDLES = 200;      // Hard cap across intervals
 const MAX_RAW_TICKS = Math.max(300, (15 * 60 * 1000) / POLLING_INTERVAL_MS * 3); // Store enough raw ticks for ~45 mins (for 15m re-aggregation)
-const INITIAL_BRUSH_POINTS_VISIBLE = Math.floor(MAX_DISPLAY_POINTS * 0.6); // How many points the brush shows initially (e.g., last 60%)
+const INITIAL_BRUSH_POINTS_VISIBLE = MAX_DISPLAY_POINTS;
 const USER_WINDOW_HOLD_MS = 30 * 1000; // Time to keep manual brush view
 const CENTER_OFFSET = Math.floor(MAX_DISPLAY_POINTS / 2);
 const RIGHT_MARGIN_SLOTS = Math.floor(MAX_DISPLAY_POINTS * 0.15);
+
+const computeWindow = (len) => {
+    const end = Math.max(0, len - 1);
+    const start = Math.max(0, end - MAX_DISPLAY_POINTS + 1);
+    return { startIndex: start, endIndex: end };
+};
 
 // --- Helper Functions ---
 const formatUsd = (value, detail = false) => { 
@@ -54,11 +60,23 @@ const CandlestickShape = React.memo((props) => {
   if (!payload || payload.open == null || payload.high == null || payload.low == null || payload.close == null || !yAxis || typeof yAxis.scale !== 'function' || !candleSlotWidth || candleSlotWidth <= 0 || isNaN(candleSlotWidth)) { return null; }
   const scale = yAxis.scale; const yHigh = typeof payload.high === 'number' ? scale(payload.high) : NaN; const yLow = typeof payload.low === 'number' ? scale(payload.low) : NaN; const yOpen = typeof payload.open === 'number' ? scale(payload.open) : NaN; const yClose = typeof payload.close === 'number' ? scale(payload.close) : NaN;
   if ([yHigh, yLow, yOpen, yClose].some(val => isNaN(val))) { return null; }
-  const isGreen = payload.close >= payload.open; const color = isGreen ? '#26A69A' : '#EF5350'; const bodyY = Math.min(yOpen, yClose); const bodyHeight = Math.max(1, Math.abs(yOpen - yClose)); const candleActualWidth = Math.max(1, candleSlotWidth * 0.7); const xCoord = x + (candleSlotWidth - candleActualWidth) / 2; 
+  const isGreen = payload.close >= payload.open; const color = isGreen ? "#26A69A" : "#EF5350"; const bodyY = Math.min(yOpen, yClose); const bodyHeight = Math.max(1, Math.abs(yOpen - yClose)); const candleActualWidth = Math.max(1, candleSlotWidth * 0.6); const xCoord = x + (candleSlotWidth - candleActualWidth) / 2;
     if (isNaN(xCoord) || isNaN(bodyY) || isNaN(bodyHeight) || isNaN(candleActualWidth) ) { console.warn("CandlestickShape: NaN value detected before rendering SVG shape", { xCoord, bodyY, bodyHeight, candleActualWidth, yHigh, yLow, props }); return null; }
   return ( <g> <line x1={xCoord + candleActualWidth / 2} y1={yHigh} x2={xCoord + candleActualWidth / 2} y2={yLow} stroke={color} strokeWidth={1.5} /> <rect x={xCoord} y={bodyY} width={candleActualWidth} height={bodyHeight} fill={color} /> </g> );
 });
-CandlestickShape.displayName = 'CandlestickShape'; 
+CandlestickShape.displayName = 'CandlestickShape';
+
+const CandleTooltip = ({ active, payload, label }) => {
+    if (!active || !payload || !payload.length) return null;
+    const d = payload[0].payload;
+    if (!d || d.open == null || d.close == null) return null;
+    return (
+        <div style={{ backgroundColor: 'rgba(30,30,30,0.9)', border: '1px solid #555', borderRadius: 4, padding: '8px 12px' }}>
+            <div style={{ color: '#fff', fontSize: '12px', marginBottom: 4, fontWeight: 'bold' }}>{formatTime(label)}</div>
+            <div style={{ color: '#eee', fontSize: '11px' }}>O: {d.open.toPrecision(6)}<br/>C: {d.close.toPrecision(6)}</div>
+        </div>
+    );
+}; 
 
 // --- Re-aggregation Function ---
 const aggregateHistoricalCandles = (rawTicks, intervalMs, maxCandles) => {
@@ -135,22 +153,15 @@ export default function LiveTokenChart({
         }
     }, [hasMounted]);
   
-    const initialBrushEndIndex = MAX_DISPLAY_POINTS - 1;
-    const initialBrushStartIndex = Math.max(0, initialBrushEndIndex - INITIAL_BRUSH_POINTS_VISIBLE + 1);
-    const [brushWindow, setBrushWindow] = useState({ 
-        startIndex: initialBrushStartIndex, 
-        endIndex: initialBrushEndIndex 
-    });
+    const [brushWindow, setBrushWindow] = useState(() => computeWindow(0));
 
     useEffect(() => {
         if (!hasMounted) return;
         if (tokenMint && tokenDecimals !== undefined && tokenDecimals !== null) {
             setOhlcData([]); setCurrentCandle(null);
-            const defaultEndIndex = MAX_DISPLAY_POINTS - 1;
-            const defaultStartIndex = Math.max(0, defaultEndIndex - INITIAL_BRUSH_POINTS_VISIBLE + 1);
             lastBrushInteractionRef.current = Date.now();
             prevDataLenRef.current = 0;
-            setBrushWindow({ startIndex: defaultStartIndex, endIndex: defaultEndIndex });
+            setBrushWindow(computeWindow(0));
             startTrackingRef.current(tokenMint, connection, tokenDecimals, tokenSupply, selectedPool);
             return () => { stopTrackingRef.current(); };
         } else {
@@ -170,19 +181,17 @@ export default function LiveTokenChart({
         setOhlcData(historicalCandles);
         setCurrentCandle(null);
         
-        const newEndIndex = Math.max(0, historicalCandles.length - 1);
+       const newWindow = computeWindow(historicalCandles.length);
         setBrushWindow(prev => {
             const now = Date.now();
             const atLiveEdge = prev.endIndex >= prevDataLenRef.current - 1;
             const keepUserView = !atLiveEdge && (now - lastBrushInteractionRef.current) < USER_WINDOW_HOLD_MS;
-            const windowSize = prev.endIndex - prev.startIndex;
-            const newStartIndex = Math.max(0, newEndIndex - windowSize);
             prevDataLenRef.current = historicalCandles.length;
             if (keepUserView) {
                 return prev;
             }
-            if (prev.startIndex !== newStartIndex || prev.endIndex !== newEndIndex) {
-                return { startIndex: newStartIndex, endIndex: newEndIndex };
+            if (prev.startIndex !== newWindow.startIndex || prev.endIndex !== newWindow.endIndex) {
+                return newWindow;
             }
             return prev;
         });
@@ -199,8 +208,7 @@ export default function LiveTokenChart({
             return data.map((c, index) => ({ ...c, key: `ohlc-${c.timestamp}-${index}`, index: startOffset + index }));
         }
        const filtered = marketCapHistory.filter(mc => mc && typeof mc.timestamp === "number" && typeof mc.marketCap === "number");
-        const startOffset = Math.max(CENTER_OFFSET - filtered.length + 1, RIGHT_MARGIN_SLOTS);
-        return filtered.map((mc, index) => ({ ...mc, key: `mc-${mc.timestamp}-${index}`, index: startOffset + index }));
+       return filtered.map((mc, index) => ({ ...mc, key: `mc-${mc.timestamp}-${index}`, index }));
 
         }, [ohlcData, currentCandle, marketCapHistory, chartMode]);
 
@@ -290,8 +298,8 @@ if (!hasMounted) {
                         textAnchor="end"
                         height={45}
                     />
-                    <YAxis yAxisId="primary" domain={yAxisDomain} axisLine={{ stroke: '#444' }} tick={chartMode === 'price' ? <DexStylePriceTick /> : { fill: '#888', fontSize: 10 }} tickFormatter={chartMode !== 'price' ? defaultTickFormatter : undefined} orientation="left" scale={chartMode === 'price' ? "log" : "linear"} allowDataOverflow={false} dx={-2} width={55} />
-                    <Tooltip formatter={(value, name, entry) => { const { payload } = entry; if (chartMode === 'price' && payload && typeof payload.open !== 'undefined') { const usdO = solUsdPrice !== null ? formatUsd(payload.open * solUsdPrice, true) : 'N/A'; const usdH = solUsdPrice !== null ? formatUsd(payload.high * solUsdPrice, true) : 'N/A'; const usdL = solUsdPrice !== null ? formatUsd(payload.low * solUsdPrice, true) : 'N/A'; const usdC = solUsdPrice !== null ? formatUsd(payload.close * solUsdPrice, true) : 'N/A'; const formattedValue = `O: <span class="math-inline">\{payload\.open\.toPrecision\(6\)\} \(</span>{usdO})\nH: <span class="math-inline">\{payload\.high\.toPrecision\(6\)\} \(</span>{usdH})\nL: <span class="math-inline">\{payload\.low\.toPrecision\(6\)\} \(</span>{usdL})\nC: <span class="math-inline">\{payload\.close\.toPrecision\(6\)\} \(</span>{usdC})`; return [formattedValue, name]; } else if (chartMode === 'marketCap' && name === 'Market Cap') { const usdVal = solUsdPrice !== null ? formatUsd(value * solUsdPrice) : ''; return [`${defaultTickFormatter(value)} SOL ${usdVal}`, "Market Cap"]; } const fallbackUsd = (typeof value === 'number' && solUsdPrice !== null) ? formatUsd(value * solUsdPrice) : ''; return [`${value} ${fallbackUsd}`, name]; }} labelFormatter={(label) => new Date(label).toLocaleString()} contentStyle={{ backgroundColor: 'rgba(30, 30, 30, 0.9)', borderColor: '#555', borderRadius: '4px', padding: '8px 12px', whiteSpace: 'pre-line' }} itemStyle={{ color: '#eee', fontSize: '11px', padding: '1px 0'}} labelStyle={{ color: '#fff', fontSize: '12px', marginBottom: '5px', fontWeight: 'bold'}} cursor={{fill: 'rgba(200, 200, 200, 0.1)'}} position={{ y: 10 }} />
+                    <YAxis yAxisId="primary" domain={yAxisDomain} axisLine={{ stroke: '#444' }} tick={chartMode === 'price' ? <DexStylePriceTick /> : { fill: '#888', fontSize: 10 }} tickFormatter={chartMode !== 'price' ? defaultTickFormatter : undefined} orientation="left" scale={chartMode === 'price' ? "log" : "linear"} allowDataOverflow={true} tickCount={6} dx={-2} width={55} />
+                    <Tooltip content={<CandleTooltip />} cursor={{fill: "rgba(200,200,200,0.1)"}} />
                    
 
                     {chartMode === 'price' ? ( <Scatter yAxisId="primary" name="OHLC Details" dataKey="close" shape={(p)=>{let w=10;const {viewBox}=p;if(viewBox?.width>0){w=viewBox.width/MAX_DISPLAY_POINTS;}return <CandlestickShape {...p} width={Math.max(2,w)} />;}} isAnimationActive={false} key="priceScatter" /> )
