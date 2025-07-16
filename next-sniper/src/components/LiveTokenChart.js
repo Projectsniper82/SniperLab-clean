@@ -60,7 +60,12 @@ const CandlestickShape = React.memo((props) => {
   if (!payload || payload.open == null || payload.high == null || payload.low == null || payload.close == null || !yAxis || typeof yAxis.scale !== 'function' || !candleSlotWidth || candleSlotWidth <= 0 || isNaN(candleSlotWidth)) { return null; }
   const scale = yAxis.scale; const yHigh = typeof payload.high === 'number' ? scale(payload.high) : NaN; const yLow = typeof payload.low === 'number' ? scale(payload.low) : NaN; const yOpen = typeof payload.open === 'number' ? scale(payload.open) : NaN; const yClose = typeof payload.close === 'number' ? scale(payload.close) : NaN;
   if ([yHigh, yLow, yOpen, yClose].some(val => isNaN(val))) { return null; }
-  const isGreen = payload.close >= payload.open; const color = isGreen ? "#26A69A" : "#EF5350"; const bodyY = Math.min(yOpen, yClose); const bodyHeight = Math.max(1, Math.abs(yOpen - yClose)); const candleActualWidth = Math.max(1, candleSlotWidth * 0.6); const xCoord = x + (candleSlotWidth - candleActualWidth) / 2;
+  const isGreen = payload.close >= payload.open;
+  const color = isGreen ? "#26A69A" : "#EF5350";
+  const bodyY = Math.min(yOpen, yClose);
+  const bodyHeight = Math.max(1, Math.abs(yOpen - yClose));
+  const candleActualWidth = Math.max(1, candleSlotWidth * 0.55);
+  const xCoord = x + (candleSlotWidth - candleActualWidth) / 2;
     if (isNaN(xCoord) || isNaN(bodyY) || isNaN(bodyHeight) || isNaN(candleActualWidth) ) { console.warn("CandlestickShape: NaN value detected before rendering SVG shape", { xCoord, bodyY, bodyHeight, candleActualWidth, yHigh, yLow, props }); return null; }
   return ( <g> <line x1={xCoord + candleActualWidth / 2} y1={yHigh} x2={xCoord + candleActualWidth / 2} y2={yLow} stroke={color} strokeWidth={1.5} /> <rect x={xCoord} y={bodyY} width={candleActualWidth} height={bodyHeight} fill={color} /> </g> );
 });
@@ -72,7 +77,7 @@ const CandleTooltip = ({ active, payload, label }) => {
     if (!d || d.open == null || d.close == null) return null;
     return (
         <div style={{ backgroundColor: 'rgba(30,30,30,0.9)', border: '1px solid #555', borderRadius: 4, padding: '8px 12px' }}>
-            <div style={{ color: '#fff', fontSize: '12px', marginBottom: 4, fontWeight: 'bold' }}>{formatTime(label)}</div>
+            <div style={{ color: '#fff', fontSize: '12px', marginBottom: 4, fontWeight: 'bold' }}>{formatTime(d.timestamp)}</div>
             <div style={{ color: '#eee', fontSize: '11px' }}>O: {d.open.toPrecision(6)}<br/>C: {d.close.toPrecision(6)}</div>
         </div>
     );
@@ -297,11 +302,25 @@ if (!hasMounted) {
                         minTickGap={0}
                         textAnchor="end"
                         height={45}
+                        label={{ value: 'Time', fill: '#aaa', position: 'insideBottom', offset: -50 }}
                     />
-                    <YAxis yAxisId="primary" domain={yAxisDomain} axisLine={{ stroke: '#444' }} tick={chartMode === 'price' ? <DexStylePriceTick /> : { fill: '#888', fontSize: 10 }} tickFormatter={chartMode !== 'price' ? defaultTickFormatter : undefined} orientation="left" scale={chartMode === 'price' ? "log" : "linear"} allowDataOverflow={true} tickCount={6} dx={-2} width={55} />
+                    <YAxis
+                        yAxisId="primary"
+                        domain={yAxisDomain}
+                        axisLine={{ stroke: '#444' }}
+                        tick={chartMode === 'price' ? <DexStylePriceTick /> : { fill: '#888', fontSize: 10 }}
+                        tickFormatter={chartMode !== 'price' ? defaultTickFormatter : undefined}
+                        orientation="left"
+                        scale={chartMode === 'price' ? "log" : "linear"}
+                        allowDataOverflow={true}
+                        tickCount={6}
+                        dx={-2}
+                        width={55}
+                        label={{ value: chartMode === 'price' ? 'Price (SOL)' : 'Market Cap (SOL)', angle: -90, position: 'insideLeft', fill: '#aaa', dx: -40 }}
+                    />
+                    
                     <Tooltip content={<CandleTooltip />} cursor={{fill: "rgba(200,200,200,0.1)"}} />
                    
-
                     {chartMode === 'price' ? ( <Scatter yAxisId="primary" name="OHLC Details" dataKey="close" shape={(p)=>{let w=10;const {viewBox}=p;if(viewBox?.width>0){w=viewBox.width/MAX_DISPLAY_POINTS;}return <CandlestickShape {...p} width={Math.max(2,w)} />;}} isAnimationActive={false} key="priceScatter" /> )
                     : ( <Area yAxisId="primary" type="monotone" dataKey="marketCap" name="Market Cap" stroke="#8884d8" fill="url(#mcGradient)" fillOpacity={0.5} strokeWidth={1.5} connectNulls={true} isAnimationActive={false} dot={false} key="marketCapArea" /> )}
                     <defs> <linearGradient id="mcGradient" x1="0" y1="0" x2="0" y2="1"> <stop offset="5%" stopColor="#8884d8" stopOpacity={0.5}/> <stop offset="95%" stopColor="#8884d8" stopOpacity={0}/> </linearGradient> </defs>
