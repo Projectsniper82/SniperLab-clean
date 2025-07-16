@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import {
-  ComposedChart, XAxis, YAxis, Tooltip, ReferenceLine,
+ ComposedChart, XAxis, YAxis, Tooltip,
  ResponsiveContainer, Scatter, Line, Area, Brush
 } from 'recharts'
 import { useChartData } from '@/context/ChartDataContext'
@@ -15,6 +15,8 @@ const MAX_HISTORY_CANDLES = 200;      // Hard cap across intervals
 const MAX_RAW_TICKS = Math.max(300, (15 * 60 * 1000) / POLLING_INTERVAL_MS * 3); // Store enough raw ticks for ~45 mins (for 15m re-aggregation)
 const INITIAL_BRUSH_POINTS_VISIBLE = Math.floor(MAX_DISPLAY_POINTS * 0.6); // How many points the brush shows initially (e.g., last 60%)
 const USER_WINDOW_HOLD_MS = 30 * 1000; // Time to keep manual brush view
+const CENTER_OFFSET = Math.floor(MAX_DISPLAY_POINTS / 2);
+const RIGHT_MARGIN_SLOTS = Math.floor(MAX_DISPLAY_POINTS * 0.15);
 
 // --- Helper Functions ---
 const formatUsd = (value, detail = false) => { 
@@ -188,18 +190,19 @@ export default function LiveTokenChart({
 
     const chartSourceData = useMemo(() => {
         if (chartMode === "price") {
-            const data = [...ohlcData];
+            let data = [...ohlcData];
             if (currentCandle) {
                 data.push({ ...currentCandle, close: currentCandle.currentClose });
             }
-           return data
-                .filter(c => c && typeof c.timestamp === "number")
-                .map((c, index) => ({ ...c, key: `ohlc-${c.timestamp}-${index}` }));
+           data = data.filter(c => c && typeof c.timestamp === "number");
+            const startOffset = Math.max(CENTER_OFFSET - data.length + 1, RIGHT_MARGIN_SLOTS);
+            return data.map((c, index) => ({ ...c, key: `ohlc-${c.timestamp}-${index}`, index: startOffset + index }));
         }
-        return marketCapHistory
-            .filter(mc => mc && typeof mc.timestamp === "number" && typeof mc.marketCap === "number")
-            .map((mc, index) => ({ ...mc, key: `mc-${mc.timestamp}-${index}` }));
-    }, [ohlcData, currentCandle, marketCapHistory, chartMode]);
+       const filtered = marketCapHistory.filter(mc => mc && typeof mc.timestamp === "number" && typeof mc.marketCap === "number");
+        const startOffset = Math.max(CENTER_OFFSET - filtered.length + 1, RIGHT_MARGIN_SLOTS);
+        return filtered.map((mc, index) => ({ ...mc, key: `mc-${mc.timestamp}-${index}`, index: startOffset + index }));
+
+        }, [ohlcData, currentCandle, marketCapHistory, chartMode]);
 
     const yAxisDomain = useMemo(() => { 
         const currentDataLength = chartSourceData.length; 
@@ -272,11 +275,11 @@ if (!hasMounted) {
 
         return (
             <ResponsiveContainer key={`<span class="math-inline">\{chartMode\}\-</span>{selectedCandleIntervalMs}`} width="100%" height={420} style={{ backgroundColor: '#000' }}> 
-                <ComposedChart data={chartSourceData} margin={{ top: 5, right: 5, left: -20, bottom: 60 }}>
+               <ComposedChart data={chartSourceData} margin={{ top: 5, right: 5, left: 0, bottom: 60 }}>
                     <XAxis
-                        dataKey="timestamp"
-                        type="category"
-                        tickFormatter={formatTime}
+                        dataKey="index"
+                        type="number"
+                        tickFormatter={(v)=>{const item=chartSourceData.find(d=>d.index===v);return item?formatTime(item.timestamp):""}}
                         tick={{ fill: '#888', fontSize: 9, angle: -40 }}
                         axisLine={{ stroke: '#444' }}
                         dy={15}
@@ -289,26 +292,26 @@ if (!hasMounted) {
                     />
                     <YAxis yAxisId="primary" domain={yAxisDomain} axisLine={{ stroke: '#444' }} tick={chartMode === 'price' ? <DexStylePriceTick /> : { fill: '#888', fontSize: 10 }} tickFormatter={chartMode !== 'price' ? defaultTickFormatter : undefined} orientation="left" scale={chartMode === 'price' ? "log" : "linear"} allowDataOverflow={false} dx={-2} width={55} />
                     <Tooltip formatter={(value, name, entry) => { const { payload } = entry; if (chartMode === 'price' && payload && typeof payload.open !== 'undefined') { const usdO = solUsdPrice !== null ? formatUsd(payload.open * solUsdPrice, true) : 'N/A'; const usdH = solUsdPrice !== null ? formatUsd(payload.high * solUsdPrice, true) : 'N/A'; const usdL = solUsdPrice !== null ? formatUsd(payload.low * solUsdPrice, true) : 'N/A'; const usdC = solUsdPrice !== null ? formatUsd(payload.close * solUsdPrice, true) : 'N/A'; const formattedValue = `O: <span class="math-inline">\{payload\.open\.toPrecision\(6\)\} \(</span>{usdO})\nH: <span class="math-inline">\{payload\.high\.toPrecision\(6\)\} \(</span>{usdH})\nL: <span class="math-inline">\{payload\.low\.toPrecision\(6\)\} \(</span>{usdL})\nC: <span class="math-inline">\{payload\.close\.toPrecision\(6\)\} \(</span>{usdC})`; return [formattedValue, name]; } else if (chartMode === 'marketCap' && name === 'Market Cap') { const usdVal = solUsdPrice !== null ? formatUsd(value * solUsdPrice) : ''; return [`${defaultTickFormatter(value)} SOL ${usdVal}`, "Market Cap"]; } const fallbackUsd = (typeof value === 'number' && solUsdPrice !== null) ? formatUsd(value * solUsdPrice) : ''; return [`${value} ${fallbackUsd}`, name]; }} labelFormatter={(label) => new Date(label).toLocaleString()} contentStyle={{ backgroundColor: 'rgba(30, 30, 30, 0.9)', borderColor: '#555', borderRadius: '4px', padding: '8px 12px', whiteSpace: 'pre-line' }} itemStyle={{ color: '#eee', fontSize: '11px', padding: '1px 0'}} labelStyle={{ color: '#fff', fontSize: '12px', marginBottom: '5px', fontWeight: 'bold'}} cursor={{fill: 'rgba(200, 200, 200, 0.1)'}} position={{ y: 10 }} />
-                    {chartMode === 'price' && currentPriceForStats > 0 && ( <ReferenceLine y={currentPriceForStats} yAxisId="primary" stroke="#4CAF50" strokeDasharray="4 4" strokeOpacity={0.8}> <text x="calc(100% - 50px)" y="10" fill="#4CAF50" fontSize="10" textAnchor="middle">{currentPriceForStats.toPrecision(4)}</text> </ReferenceLine> )}
+                   
 
-                    {chartMode === 'price' ? ( <Scatter yAxisId="primary" name="OHLC Details" dataKey="close" shape={(shapeProps) => { let candleSlotWidth = 10; const { xAxis, viewBox } = shapeProps; if (xAxis && typeof xAxis.scale === 'function' && viewBox?.width > 0 && chartSourceData?.length > 0) { if (typeof xAxis.scale.bandwidth === 'function') { candleSlotWidth = xAxis.scale.bandwidth(); } else { candleSlotWidth = viewBox.width / chartSourceData.length; } } return <CandlestickShape {...shapeProps} width={Math.max(2, candleSlotWidth)} />; }} isAnimationActive={false} key="priceScatter" /> ) 
+                    {chartMode === 'price' ? ( <Scatter yAxisId="primary" name="OHLC Details" dataKey="close" shape={(p)=>{let w=10;const {viewBox}=p;if(viewBox?.width>0){w=viewBox.width/MAX_DISPLAY_POINTS;}return <CandlestickShape {...p} width={Math.max(2,w)} />;}} isAnimationActive={false} key="priceScatter" /> )
                     : ( <Area yAxisId="primary" type="monotone" dataKey="marketCap" name="Market Cap" stroke="#8884d8" fill="url(#mcGradient)" fillOpacity={0.5} strokeWidth={1.5} connectNulls={true} isAnimationActive={false} dot={false} key="marketCapArea" /> )}
                     <defs> <linearGradient id="mcGradient" x1="0" y1="0" x2="0" y2="1"> <stop offset="5%" stopColor="#8884d8" stopOpacity={0.5}/> <stop offset="95%" stopColor="#8884d8" stopOpacity={0}/> </linearGradient> </defs>
                     
                       {chartSourceData.length > 1 && ( 
                        <Brush 
-                          dataKey="timestamp" height={30} stroke="#555"
+                          dataKey="index" height={30} stroke="#555"
                           y={380}
                           startIndex={validStartIndex} 
                           endIndex={validEndIndex}
-                          tickFormatter={formatTime} 
+                          tickFormatter={(v)=>{const item=chartSourceData.find(d=>d.index===v);return item?formatTime(item.timestamp):""}} 
                           onChange={handleBrushChange} 
                           travellerWidth={10} 
                           padding={{ top: 5, bottom: 5 }} 
                           fill="rgba(60, 60, 60, 0.5)"
                         >
                           <ComposedChart> 
-                              <XAxis dataKey="timestamp" type="category" hide />
+                              <XAxis dataKey="index" type="number" domain={[0, MAX_DISPLAY_POINTS-1]} hide />
                                {chartMode === 'price' ? ( <Line type="monotone" dataKey="close" stroke="#777" dot={false} isAnimationActive={false} yAxisId="brushY" /> ) 
                                : ( <Area type="monotone" dataKey="marketCap" stroke="#777" fill="#666" fillOpacity={0.3} dot={false} isAnimationActive={false} yAxisId="brushY"/> )}
                               <YAxis hide domain={yAxisDomain} yAxisId="brushY" scale={chartMode === 'price' ? "log" : "linear"}/>
