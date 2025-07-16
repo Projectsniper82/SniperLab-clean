@@ -192,12 +192,9 @@ export default function LiveTokenChart({
             if (currentCandle) {
                 data.push({ ...currentCandle, close: currentCandle.currentClose });
             }
-           return data.map((c, index) => {
-                if (c && typeof c.timestamp === "number") {
-                    return { ...c, key: `ohlc-${c.timestamp}-${index}` };
-                }
-                return null;
-            });
+           return data
+                .filter(c => c && typeof c.timestamp === "number")
+                .map((c, index) => ({ ...c, key: `ohlc-${c.timestamp}-${index}` }));
         }
         return marketCapHistory
             .filter(mc => mc && typeof mc.timestamp === "number" && typeof mc.marketCap === "number")
