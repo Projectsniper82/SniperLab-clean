@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { Connection, PublicKey } from '@solana/web3.js';
-import { getAccount } from '@solana/spl-token';
+import { getAccount, TokenAccountNotFoundError } from '@solana/spl-token';
 import { getCreatePoolKeys } from '@raydium-io/raydium-sdk-v2';
 import Decimal from 'decimal.js';
 
@@ -117,10 +117,30 @@ export const ChartDataProvider = ({ children }: { children: React.ReactNode }) =
     const supply = supplyRef.current;
     if (!connection || !vaultKeys) return;
     try {
-      const acctA = await getAccount(connection, vaultKeys.vaultA, 'confirmed');
-      const solReserve = new Decimal(acctA.amount.toString()).div(1e9);
-      const acctB = await getAccount(connection, vaultKeys.vaultB, 'confirmed');
-      const tokenReserve = new Decimal(acctB.amount.toString()).div(new Decimal(10).pow(decimals));
+      let solReserve = new Decimal(0);
+      let tokenReserve = new Decimal(0);
+
+      try {
+        const acctA = await getAccount(connection, vaultKeys.vaultA, 'confirmed');
+        solReserve = new Decimal(acctA.amount.toString()).div(1e9);
+      } catch (e) {
+        if (e instanceof TokenAccountNotFoundError) {
+          console.warn('ChartDataProvider: vault A account not found');
+        } else {
+          throw e;
+        }
+      }
+
+      try {
+        const acctB = await getAccount(connection, vaultKeys.vaultB, 'confirmed');
+        tokenReserve = new Decimal(acctB.amount.toString()).div(new Decimal(10).pow(decimals));
+      } catch (e) {
+        if (e instanceof TokenAccountNotFoundError) {
+          console.warn('ChartDataProvider: vault B account not found');
+        } else {
+          throw e;
+        }
+      }
 
       let priceNum: number;
       let marketCapNum: number;

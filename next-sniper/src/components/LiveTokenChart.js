@@ -307,9 +307,9 @@ if (!hasMounted) {
                         dataKey="index"
                         type="number"
                         domain={[0, MAX_DISPLAY_POINTS - 1]}
-                         tickFormatter={(v) => {
+                        tickFormatter={(v) => {
                             const idx = Math.round(v);
-                            const item = chartSourceData.find((d) => d.index === val);
+                            const item = chartSourceData.find((d) => d.index === idx);
                             return item ? formatTime(item.timestamp) : '';
                         }}
                         tick={{ fill: '#888', fontSize: 9, angle: -40 }}
