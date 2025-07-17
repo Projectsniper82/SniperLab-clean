@@ -309,7 +309,7 @@ if (!hasMounted) {
                         domain={[0, MAX_DISPLAY_POINTS - 1]}
                          tickFormatter={(v) => {
                             const idx = Math.round(v);
-                            const item = chartSourceData[idx];
+                            const item = chartSourceData.find((d) => d.index === val);
                             return item ? formatTime(item.timestamp) : '';
                         }}
                         tick={{ fill: '#888', fontSize: 9, angle: -40 }}
@@ -317,7 +317,21 @@ if (!hasMounted) {
                         tickLine={{ stroke: '#444' }}
                         dy={15}
                         dx={-10}
-                        interval={Math.max(0, Math.ceil((validEndIndex - validStartIndex + 1) / 6) - 1)}
+                        interval={0}
+                        ticks={(() => {
+                            const ticks = [];
+                            const range = validEndIndex - validStartIndex;
+                            const step = Math.max(1, Math.round(range / 5));
+                            for (let i = validStartIndex; i <= validEndIndex; i += step) {
+                                const item = chartSourceData[i];
+                                if (item) ticks.push(item.index);
+                            }
+                            const last = chartSourceData[validEndIndex];
+                            if (last && ticks[ticks.length - 1] !== last.index) {
+                                ticks.push(last.index);
+                            }
+                            return ticks;
+                        })()}
                         allowDuplicatedCategory={false}
                         minTickGap={0}
                         textAnchor="end"

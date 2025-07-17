@@ -401,6 +401,12 @@ function SimulatedLiquidityManager({
                     setSimulatedPool(updatedPoolInfo);
                 }
                 refreshBalances();
+                setTimeout(() => {
+                    if (wallet?.publicKey) {
+                        console.log("[SimulatedLiquidityManager] Running delayed refreshBalances after add liquidity...");
+                        refreshBalances();
+                    }
+                }, 7000);
             } else {
                 // This case might be hit if addRaydiumLiquidity isn't implemented or sim fails to return sig
                 // setError("Add liquidity operation did not return a signature.");

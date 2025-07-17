@@ -1,3 +1,4 @@
+import { fetchRaydiumPoolsFromSDK } from '@/utils/poolFinder';
 'use client';
 
 import React, { useEffect, useCallback, useState } from 'react';
@@ -88,13 +89,10 @@ export default function TradingBotsPage() {
         }
 
         console.log(`[DEBUG] Starting LP check for token: ${tokenAddress}`);
-
         try {
-            // SIMULATION of your fetching logic from the logs
-            // Replace this with your actual implementation (e.g., call to Raydium SDK)
-            const poolFound = true; // Assume your logic sets this to true on success
-
-            if (poolFound) {
+            const cluster = network === 'devnet' ? 'devnet' : 'mainnet';
+            const pools = await fetchRaydiumPoolsFromSDK(connection, tokenAddress, cluster, publicKey);
+            if (pools && pools.length > 0) {
                 console.log("[DEBUG] LP was found, updating context.");
                 setIsLpActive(true);
             } else {
@@ -106,7 +104,7 @@ export default function TradingBotsPage() {
             setIsLpActive(false);
         }
 
-    }, [tokenAddress, publicKey, setIsLpActive]);
+     }, [tokenAddress, publicKey, connection, network, setIsLpActive]);
 
  // Run the check whenever the token or wallet changes
     useEffect(() => {
