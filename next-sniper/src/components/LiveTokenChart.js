@@ -321,7 +321,8 @@ if (!hasMounted) {
                         ticks={(() => {
                             const ticks = [];
                             const range = validEndIndex - validStartIndex;
-                            const step = Math.max(1, Math.round(range / 5));
+                            const desired = 5;
+                            const step = Math.max(1, Math.ceil(range / desired));
                             for (let i = validStartIndex; i <= validEndIndex; i += step) {
                                 const item = chartSourceData[i];
                                 if (item) ticks.push(item.index);
@@ -333,7 +334,7 @@ if (!hasMounted) {
                             return ticks;
                         })()}
                         allowDuplicatedCategory={false}
-                        minTickGap={0}
+                        minTickGap={15}
                         textAnchor="end"
                         height={45}
                         label={{ value: 'Time', fill: '#aaa', position: 'insideBottom', offset: -50 }}
