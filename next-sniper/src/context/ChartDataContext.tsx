@@ -58,6 +58,7 @@ export const ChartDataProvider = ({ children }: { children: React.ReactNode }) =
   const supplyRef = useRef<string>('0');
   const connectionRef = useRef<Connection | null>(null);
   const selectedPoolRef = useRef<{ vaultA?: string; vaultB?: string } | undefined>(undefined);
+  const lastTrackedPoolRef = useRef<{ vaultA?: string; vaultB?: string } | undefined>(undefined);
   const vaultKeysRef = useRef<VaultKeys | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const solIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -174,6 +175,7 @@ export const ChartDataProvider = ({ children }: { children: React.ReactNode }) =
     (mint: string, connection: Connection, decimals: number, supply: string, pool?: { vaultA?: string; vaultB?: string }) => {
       const isNewToken = lastTrackedMintRef.current !== mint;
       const isNewConnection = lastTrackedConnectionRef.current !== connection;
+      const poolChanged = JSON.stringify(lastTrackedPoolRef.current) !== JSON.stringify(pool || {});
 
       tokenMintRef.current = mint;
       decimalsRef.current = decimals;
@@ -181,7 +183,7 @@ export const ChartDataProvider = ({ children }: { children: React.ReactNode }) =
       connectionRef.current = connection;
       selectedPoolRef.current = pool;
       vaultKeysRef.current = deriveVaultKeys(mint, pool);
-       if (isNewToken || isNewConnection) {
+       if (isNewToken || isNewConnection || poolChanged) {
         resetState();
         setIsInitialLoading(true);
         isInitialLoadingRef.current = true;
@@ -196,6 +198,7 @@ export const ChartDataProvider = ({ children }: { children: React.ReactNode }) =
       fetchReserves();
       lastTrackedMintRef.current = mint;
       lastTrackedConnectionRef.current = connection;
+      lastTrackedPoolRef.current = pool;
     },
     [deriveVaultKeys, fetchReserves, fetchSolPrice]
   );
@@ -212,6 +215,7 @@ export const ChartDataProvider = ({ children }: { children: React.ReactNode }) =
     vaultKeysRef.current = null;
     connectionRef.current = null;
     tokenMintRef.current = '';
+    lastTrackedPoolRef.current = undefined;
   }, []);
 
   useEffect(() => {

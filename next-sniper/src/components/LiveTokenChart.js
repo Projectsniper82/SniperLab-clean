@@ -43,13 +43,24 @@ const defaultTickFormatter = (v) => {
 
 // --- Custom Tick Component ---
 const DexStylePriceTick = React.memo((props) => {
-    const { x, y, payload, textAnchor = "end", fill = "#ddd", fontSize = 10 } = props;
-    const { value } = payload;
-    if (typeof value !== 'number' || isNaN(value)) return null;
-    let formattedTick = ''; const threshold = 0.001;
-    if (value > 0 && value < threshold) { const s = value.toFixed(20); const match = s.match(/^0\.(0+)([1-9]\d{0,3})/); if (match && match[1] && match[2]) { const zeros = match[1].length; const significantDigits = match[2]; if (zeros >= 2) { formattedTick = `0.0..<span class="math-inline">\{zeros\}\.\.</span>{significantDigits}`; } else { formattedTick = value.toPrecision(4); } } else { formattedTick = value.toExponential(2); } } 
-    else { if (value === 0) formattedTick = '0'; else if (value >= 1000) formattedTick = defaultTickFormatter(value); else if (value >= 1) formattedTick = value.toFixed(2); else formattedTick = value.toFixed(4); }
-    return ( <g transform={`translate(<span class="math-inline">\{x\},</span>{y})`}> <text x={0} y={0} dy={fontSize * 0.35} textAnchor={textAnchor} fill={fill} fontSize={fontSize}> {formattedTick} </text> </g> );
+    const { x, y, payload, textAnchor = 'end', fill = '#ddd', fontSize = 10 } = props;
+  const { value } = payload;
+  if (typeof value !== 'number' || isNaN(value)) return null;
+  let formattedTick = '';
+  if (value >= 1) {
+    formattedTick = value.toFixed(2);
+  } else if (value >= 0.01) {
+    formattedTick = value.toFixed(4);
+  } else {
+    formattedTick = value.toExponential(2);
+  }
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={0} y={0} dy={fontSize * 0.35} textAnchor={textAnchor} fill={fill} fontSize={fontSize}>
+        {formattedTick}
+      </text>
+    </g>
+  );
 });
 DexStylePriceTick.displayName = 'DexStylePriceTick';
 
@@ -290,7 +301,7 @@ if (!hasMounted) {
         const validEndIndex = Math.max(validStartIndex, Math.min(brushWindow.endIndex, currentDataLen - 1));
 
         return (
-            <ResponsiveContainer key={`<span class="math-inline">\{chartMode\}\-</span>{selectedCandleIntervalMs}`} width="100%" height={420} style={{ backgroundColor: '#000' }}> 
+           <ResponsiveContainer key={`${chartMode}-${selectedCandleIntervalMs}`} width="100%" height={420} style={{ backgroundColor: '#000' }}>
                <ComposedChart data={chartSourceData} margin={{ top: 5, right: 5, left: 0, bottom: 60 }}>
                     <XAxis
                         dataKey="index"
