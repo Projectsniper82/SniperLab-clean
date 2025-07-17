@@ -192,18 +192,28 @@ export const ChartDataProvider = ({ children }: { children: React.ReactNode }) =
   }, []);
 
   const startTracking = useCallback(
-    (mint: string, connection: Connection, decimals: number, supply: string, pool?: { vaultA?: string; vaultB?: string }) => {
+    (
+      mint: string,
+      connection: Connection,
+      decimals: number,
+      supply: string,
+      pool?: { vaultA?: string; vaultB?: string }
+    ) => {
       const isNewToken = lastTrackedMintRef.current !== mint;
       const isNewConnection = lastTrackedConnectionRef.current !== connection;
-      const poolChanged = JSON.stringify(lastTrackedPoolRef.current) !== JSON.stringify(pool || {});
+      const poolToUse = pool ?? lastTrackedPoolRef.current;
+      const poolChanged =
+        pool !== undefined &&
+        JSON.stringify(lastTrackedPoolRef.current) !== JSON.stringify(pool);
 
       tokenMintRef.current = mint;
       decimalsRef.current = decimals;
       supplyRef.current = supply;
       connectionRef.current = connection;
-      selectedPoolRef.current = pool;
-      vaultKeysRef.current = deriveVaultKeys(mint, pool);
-       if (isNewToken || isNewConnection || poolChanged) {
+      selectedPoolRef.current = poolToUse ?? undefined;
+      vaultKeysRef.current = deriveVaultKeys(mint, poolToUse);
+
+      if (isNewToken || isNewConnection || poolChanged) {
         resetState();
         setIsInitialLoading(true);
         isInitialLoadingRef.current = true;
@@ -218,7 +228,7 @@ export const ChartDataProvider = ({ children }: { children: React.ReactNode }) =
       fetchReserves();
       lastTrackedMintRef.current = mint;
       lastTrackedConnectionRef.current = connection;
-      lastTrackedPoolRef.current = pool;
+      lastTrackedPoolRef.current = poolToUse;
     },
     [deriveVaultKeys, fetchReserves, fetchSolPrice]
   );

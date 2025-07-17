@@ -47,6 +47,17 @@ export default function TradingBotsPage() {
     const [creationState, setCreationState] = useState<'idle' | 'processing'>('idle');
     const { reloadWallets } = useBotWalletReload();
 
+    // Access token-related state early so other handlers can use it
+    const {
+        tokenAddress,
+        tokenDecimals,
+        setTokenDecimals,
+        isLpActive,
+        setIsLpActive,
+        setTokenAddress,
+    } = useToken();
+
+
     const handleSelectPreset = (preset: string) => {
         setBotCode(preset);
         setIsAdvancedMode(false);
@@ -57,6 +68,12 @@ export default function TradingBotsPage() {
     };
 
     const { lastPrice, currentMarketCap, currentLpValue, solUsdPrice } = useChartData();
+
+     useEffect(() => {
+        if (currentLpValue > 0) {
+            setIsLpActive(true);
+        }
+    }, [currentLpValue, setIsLpActive]);
 
     const handleToggleAdvancedMode = (checked: boolean) => {
         setIsAdvancedMode(checked);
@@ -74,9 +91,6 @@ export default function TradingBotsPage() {
             addLog('Advanced mode disabled.');
         }
     };
-
-    // FIX: Get the setter function from the context
-     const { tokenAddress, tokenDecimals, setTokenDecimals, isLpActive, setIsLpActive, setTokenAddress } = useToken();
 
     const currentBots = allBotsByNetwork[network];
     // --- Placeholder for your LP fetching logic ---
