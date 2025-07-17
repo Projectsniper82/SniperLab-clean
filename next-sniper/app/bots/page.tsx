@@ -1,6 +1,6 @@
-import { fetchRaydiumPoolsFromSDK } from '@/utils/poolFinder';
 'use client';
 
+import { fetchRaydiumPoolsFromSDK } from '@/utils/poolFinder';
 import React, { useEffect, useCallback, useState } from 'react';
 import AppHeader from '@/components/AppHeader';
 import BotManager from '@/components/BotManager';
