@@ -21,6 +21,11 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   // FIX: Create the state for isLpActive here
   const [isLpActive, setIsLpActive] = useState(false);
 
+  // Reset LP state whenever a new token address is set
+  React.useEffect(() => {
+    setIsLpActive(false);
+  }, [tokenAddress]);
+
   // FIX: Provide the new state and setter in the context value
   const value = {
     tokenAddress,

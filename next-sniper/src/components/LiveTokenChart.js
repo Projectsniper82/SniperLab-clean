@@ -174,19 +174,19 @@ export default function LiveTokenChart({
     useEffect(() => {
         if (!hasMounted) return;
         if (tokenMint && tokenDecimals !== undefined && tokenDecimals !== null) {
-            setOhlcData([]); setCurrentCandle(null);
+            setOhlcData([]);
+            setCurrentCandle(null);
             lastBrushInteractionRef.current = Date.now();
             prevDataLenRef.current = 0;
             setBrushWindow(computeWindow(0));
             startTrackingRef.current(tokenMint, connection, tokenDecimals, tokenSupply, selectedPool);
-            return () => { stopTrackingRef.current(); };
         } else {
             setOhlcData([]);
             setCurrentCandle(null);
             prevDataLenRef.current = 0;
             stopTrackingRef.current();
         }
-    }, [tokenMint, tokenDecimals, connection, tokenSupply, selectedPool]);
+    }, [hasMounted, tokenMint, tokenDecimals, connection, tokenSupply, selectedPool]);
 
     useEffect(() => {
          if (!hasMounted) return;
@@ -307,7 +307,11 @@ if (!hasMounted) {
                         dataKey="index"
                         type="number"
                         domain={[0, MAX_DISPLAY_POINTS - 1]}
-                        tickFormatter={(v)=>{const item=chartSourceData.find(d=>d.index===v);return item?formatTime(item.timestamp):""}}
+                         tickFormatter={(v) => {
+                            const idx = Math.round(v);
+                            const item = chartSourceData[idx];
+                            return item ? formatTime(item.timestamp) : '';
+                        }}
                         tick={{ fill: '#888', fontSize: 9, angle: -40 }}
                         axisLine={{ stroke: '#444' }}
                         tickLine={{ stroke: '#444' }}
