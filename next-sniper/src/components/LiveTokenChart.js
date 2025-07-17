@@ -158,6 +158,7 @@ export default function LiveTokenChart({
 
     const startTrackingRef = useRef(startTracking);
     const stopTrackingRef = useRef(stopTracking);
+    const lastConfigRef = useRef({ mint: '', connection: null, pool: null });
     const lastBrushInteractionRef = useRef(0);
     const prevDataLenRef = useRef(0);
 
@@ -173,20 +174,33 @@ export default function LiveTokenChart({
 
     useEffect(() => {
         if (!hasMounted) return;
+        const sameMint = lastConfigRef.current.mint === tokenMint;
+        const sameConn = lastConfigRef.current.connection === connection;
+        const samePool = JSON.stringify(lastConfigRef.current.pool) === JSON.stringify(selectedPool);
         if (tokenMint && tokenDecimals !== undefined && tokenDecimals !== null) {
-            setOhlcData([]);
-            setCurrentCandle(null);
-            lastBrushInteractionRef.current = Date.now();
-            prevDataLenRef.current = 0;
-            setBrushWindow(computeWindow(0));
-            startTrackingRef.current(tokenMint, connection, tokenDecimals, tokenSupply, selectedPool);
+            if (!sameMint || !sameConn || !samePool) {
+                setOhlcData([]);
+                setCurrentCandle(null);
+                lastBrushInteractionRef.current = Date.now();
+                prevDataLenRef.current = 0;
+                setBrushWindow(computeWindow(0));
+                startTrackingRef.current(tokenMint, connection, tokenDecimals, tokenSupply, selectedPool);
+                lastConfigRef.current = { mint: tokenMint, connection, pool: selectedPool };
+            }
         } else {
             setOhlcData([]);
             setCurrentCandle(null);
             prevDataLenRef.current = 0;
             stopTrackingRef.current();
+            lastConfigRef.current = { mint: '', connection: null, pool: null };
         }
     }, [hasMounted, tokenMint, tokenDecimals, connection, tokenSupply, selectedPool]);
+
+    useEffect(() => {
+        return () => {
+            stopTrackingRef.current();
+        };
+    }, []);
 
     useEffect(() => {
          if (!hasMounted) return;
@@ -334,7 +348,7 @@ if (!hasMounted) {
                             return ticks;
                         })()}
                         allowDuplicatedCategory={false}
-                        minTickGap={15}
+                        minTickGap={30}
                         textAnchor="end"
                         height={45}
                         label={{ value: 'Time', fill: '#aaa', position: 'insideBottom', offset: -50 }}

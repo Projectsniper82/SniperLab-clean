@@ -1,6 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { useChartData } from './ChartDataContext';
 
 // FIX: Add isLpActive and its setter to the context's type definition
 interface TokenContextState {
@@ -20,6 +21,14 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   
   // FIX: Create the state for isLpActive here
   const [isLpActive, setIsLpActive] = useState(false);
+
+  const { currentLpValue } = useChartData();
+
+  useEffect(() => {
+    if (currentLpValue > 0) {
+      setIsLpActive(true);
+    }
+  }, [currentLpValue]);
 
   // Reset LP state whenever a new token address is set
   React.useEffect(() => {
