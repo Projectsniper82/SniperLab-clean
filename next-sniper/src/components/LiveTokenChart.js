@@ -168,6 +168,7 @@ export default function LiveTokenChart({
         return [];
     }, [rawPriceHistory]);
 
+    const [selectedCandleIntervalMs, setSelectedCandleIntervalMs] = useState(INITIAL_CANDLE_INTERVAL_MS);
     const aggregatedCandles = useMemo(() => {
         if (!rawPriceHistory || rawPriceHistory.length === 0) return [];
         const maxCandles = Math.min(
