@@ -130,17 +130,13 @@ const aggregateHistoricalCandles = (rawTicks, intervalMs, maxCandles) => {
 
 // --- Main Chart Component ---
 export default function LiveTokenChart({
-  tokenMint, tokenDecimals, tokenSupply, connection, selectedPool, network
+ tokenMint,
+  tokenDecimals,
+  tokenSupply,
+  connection,
+  selectedPool,
+  network,
 }) {
-    const [hasMounted, setHasMounted] = useState(false);
-    const [selectedCandleIntervalMs, setSelectedCandleIntervalMs] = useState(INITIAL_CANDLE_INTERVAL_MS);
-    const [chartMode, setChartMode] = useState('price'); 
-    const [ohlcData, setOhlcData] = useState([]);
-    const [currentCandle, setCurrentCandle] = useState(null);
-
-    useEffect(() => {
-        setHasMounted(true);
-    }, []);
 
     const {
         rawPriceHistory,
@@ -155,6 +151,32 @@ export default function LiveTokenChart({
         startTracking,
         stopTracking,
     } = useChartData();
+
+    const initialOhlcData = useMemo(() => {
+        if (rawPriceHistory && rawPriceHistory.length > 0) {
+            const maxCandles = Math.min(
+                MAX_DISPLAY_POINTS,
+                MAX_HISTORY_CANDLES,
+                Math.floor((MAX_RAW_TICKS * POLLING_INTERVAL_MS) / INITIAL_CANDLE_INTERVAL_MS)
+            );
+            return aggregateHistoricalCandles(
+                rawPriceHistory,
+                INITIAL_CANDLE_INTERVAL_MS,
+                maxCandles
+            );
+        }
+        return [];
+    }, [rawPriceHistory]);
+
+    const [hasMounted, setHasMounted] = useState(false);
+    const [selectedCandleIntervalMs, setSelectedCandleIntervalMs] = useState(INITIAL_CANDLE_INTERVAL_MS);
+    const [chartMode, setChartMode] = useState('price');
+    const [ohlcData, setOhlcData] = useState(initialOhlcData);
+    const [currentCandle, setCurrentCandle] = useState(null);
+
+    useEffect(() => {
+        setHasMounted(true);
+    }, []);
 
     const startTrackingRef = useRef(startTracking);
     const stopTrackingRef = useRef(stopTracking);
@@ -189,7 +211,7 @@ export default function LiveTokenChart({
         }
     }, [rawPriceHistory, selectedCandleIntervalMs]);
   
-    const [brushWindow, setBrushWindow] = useState(() => computeWindow(0));
+     const [brushWindow, setBrushWindow] = useState(() => computeWindow(initialOhlcData.length));
 
     useEffect(() => {
         if (!hasMounted) return;
