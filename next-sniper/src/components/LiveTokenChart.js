@@ -181,7 +181,6 @@ export default function LiveTokenChart({
 
 
     const [hasMounted, setHasMounted] = useState(false);
-    const [selectedCandleIntervalMs, setSelectedCandleIntervalMs] = useState(INITIAL_CANDLE_INTERVAL_MS);
     const [chartMode, setChartMode] = useState('price');
     const [ohlcData, setOhlcData] = useState(initialOhlcData);
     const [currentCandle, setCurrentCandle] = useState(null);
