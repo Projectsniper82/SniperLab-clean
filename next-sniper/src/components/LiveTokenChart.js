@@ -168,6 +168,17 @@ export default function LiveTokenChart({
         return [];
     }, [rawPriceHistory]);
 
+    const aggregatedCandles = useMemo(() => {
+        if (!rawPriceHistory || rawPriceHistory.length === 0) return [];
+        const maxCandles = Math.min(
+            MAX_DISPLAY_POINTS,
+            MAX_HISTORY_CANDLES,
+            Math.floor((MAX_RAW_TICKS * POLLING_INTERVAL_MS) / selectedCandleIntervalMs)
+        );
+        return aggregateHistoricalCandles(rawPriceHistory, selectedCandleIntervalMs, maxCandles);
+    }, [rawPriceHistory, selectedCandleIntervalMs]);
+
+
     const [hasMounted, setHasMounted] = useState(false);
     const [selectedCandleIntervalMs, setSelectedCandleIntervalMs] = useState(INITIAL_CANDLE_INTERVAL_MS);
     const [chartMode, setChartMode] = useState('price');
@@ -196,21 +207,11 @@ export default function LiveTokenChart({
     // previously fetched data is displayed immediately when navigating
     // back to the chart.
     useEffect(() => {
-        if (rawPriceHistory && rawPriceHistory.length > 0) {
-            const maxCandles = Math.min(
-                MAX_DISPLAY_POINTS,
-                MAX_HISTORY_CANDLES,
-                Math.floor((MAX_RAW_TICKS * POLLING_INTERVAL_MS) / selectedCandleIntervalMs)
-            );
-            const historicalCandles = aggregateHistoricalCandles(
-                rawPriceHistory,
-                selectedCandleIntervalMs,
-                maxCandles
-            );
-            setOhlcData(historicalCandles);
-        }
-    }, [rawPriceHistory, selectedCandleIntervalMs]);
-  
+    if (aggregatedCandles.length > 0) {
+        setOhlcData(aggregatedCandles);
+    }
+}, [aggregatedCandles]);
+    
      const [brushWindow, setBrushWindow] = useState(() => computeWindow(initialOhlcData.length));
 
     useEffect(() => {
@@ -240,19 +241,13 @@ export default function LiveTokenChart({
 
     useEffect(() => {
         if (!hasMounted) return;
-        if (rawPriceHistory.length === 0) return;
+       if (aggregatedCandles.length === 0) return;
         console.log(`LiveTokenChart: Interval changed to ${selectedCandleIntervalMs / 1000}s. Re-aggregating.`);
-        const maxCandles = Math.min(
-            MAX_DISPLAY_POINTS,
-            MAX_HISTORY_CANDLES,
-            Math.floor((MAX_RAW_TICKS * POLLING_INTERVAL_MS) / selectedCandleIntervalMs)
-        );
-        const historicalCandles = aggregateHistoricalCandles(rawPriceHistory, selectedCandleIntervalMs, maxCandles);
         setOhlcData(prev => {
             const isSame =
-                prev.length === historicalCandles.length &&
+                 prev.length === aggregatedCandles.length &&
                 prev.every((c, i) => {
-                    const next = historicalCandles[i];
+                    const next = aggregatedCandles[i];
                     return (
                         c &&
                         next &&
@@ -268,16 +263,16 @@ export default function LiveTokenChart({
                 return prev;
             }
             console.log('[LiveTokenChart] Candles changed, updating.');
-            return historicalCandles;
+            return aggregatedCandles;
         });
         setCurrentCandle(null);
         
-       const newWindow = computeWindow(historicalCandles.length);
+       const newWindow = computeWindow(aggregatedCandles.length);
         setBrushWindow(prev => {
             const now = Date.now();
             const atLiveEdge = prev.endIndex >= prevDataLenRef.current - 1;
             const keepUserView = !atLiveEdge && (now - lastBrushInteractionRef.current) < USER_WINDOW_HOLD_MS;
-            prevDataLenRef.current = historicalCandles.length;
+             prevDataLenRef.current = aggregatedCandles.length;
             if (keepUserView) {
                 return prev;
             }
@@ -286,7 +281,7 @@ export default function LiveTokenChart({
             }
             return prev;
         });
-    }, [hasMounted, selectedCandleIntervalMs, rawPriceHistory])
+     }, [hasMounted, aggregatedCandles, selectedCandleIntervalMs])
 
     const chartSourceData = useMemo(() => {
         if (chartMode === "price") {
