@@ -196,11 +196,9 @@ export default function LiveTokenChart({
         }
     }, [hasMounted, tokenMint, tokenDecimals, connection, tokenSupply, selectedPool]);
 
-    useEffect(() => {
-        return () => {
-            stopTrackingRef.current();
-        };
-    }, []);
+    // Do not stop tracking on unmount so data continues accumulating even when
+    // the chart component is not visible. Tracking will stop when the token
+    // itself is cleared via the dependency effect above.
 
     useEffect(() => {
          if (!hasMounted) return;
@@ -331,7 +329,6 @@ if (!hasMounted) {
                         tickLine={{ stroke: '#444' }}
                         dy={15}
                         dx={-10}
-                        interval={0}
                         ticks={(() => {
                             const ticks = [];
                             const range = validEndIndex - validStartIndex;
