@@ -164,11 +164,30 @@ export default function LiveTokenChart({
 
     useEffect(() => { startTrackingRef.current = startTracking; }, [startTracking]);
     useEffect(() => { stopTrackingRef.current = stopTracking; }, [stopTracking]);
-     useEffect(() => {
+    useEffect(() => {
         if (hasMounted) {
             lastBrushInteractionRef.current = Date.now();
         }
     }, [hasMounted]);
+
+    // Rehydrate local chart state from global context on mount so any
+    // previously fetched data is displayed immediately when navigating
+    // back to the chart.
+    useEffect(() => {
+        if (rawPriceHistory && rawPriceHistory.length > 0) {
+            const maxCandles = Math.min(
+                MAX_DISPLAY_POINTS,
+                MAX_HISTORY_CANDLES,
+                Math.floor((MAX_RAW_TICKS * POLLING_INTERVAL_MS) / selectedCandleIntervalMs)
+            );
+            const historicalCandles = aggregateHistoricalCandles(
+                rawPriceHistory,
+                selectedCandleIntervalMs,
+                maxCandles
+            );
+            setOhlcData(historicalCandles);
+        }
+    }, [rawPriceHistory, selectedCandleIntervalMs]);
   
     const [brushWindow, setBrushWindow] = useState(() => computeWindow(0));
 
@@ -179,11 +198,10 @@ export default function LiveTokenChart({
         const samePool = JSON.stringify(lastConfigRef.current.pool) === JSON.stringify(selectedPool);
         if (tokenMint && tokenDecimals !== undefined && tokenDecimals !== null) {
             if (!sameMint || !sameConn || !samePool) {
-                setOhlcData([]);
-                setCurrentCandle(null);
+                // Do not clear existing data when remounting with the same
+                // configuration. Simply resume tracking so the accumulated
+                // history in ChartDataContext continues to be used.
                 lastBrushInteractionRef.current = Date.now();
-                prevDataLenRef.current = 0;
-                setBrushWindow(computeWindow(0));
                 startTrackingRef.current(tokenMint, connection, tokenDecimals, tokenSupply, selectedPool);
                 lastConfigRef.current = { mint: tokenMint, connection, pool: selectedPool };
             }
