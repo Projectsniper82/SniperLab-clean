@@ -1,7 +1,6 @@
 'use client';
 
-import { fetchRaydiumPoolsFromSDK } from '@/utils/poolFinder';
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import AppHeader from '@/components/AppHeader';
 import BotManager from '@/components/BotManager';
 import GlobalBotControls from '@/components/GlobalBotControls';
@@ -69,10 +68,8 @@ export default function TradingBotsPage() {
 
     const { lastPrice, currentMarketCap, currentLpValue, solUsdPrice } = useChartData();
 
-     useEffect(() => {
-        if (currentLpValue > 0) {
-            setIsLpActive(true);
-        }
+      useEffect(() => {
+        setIsLpActive(currentLpValue > 0);
     }, [currentLpValue, setIsLpActive]);
 
     const handleToggleAdvancedMode = (checked: boolean) => {
@@ -92,38 +89,8 @@ export default function TradingBotsPage() {
         }
     };
 
-    const currentBots = allBotsByNetwork[network];
-    // --- Placeholder for your LP fetching logic ---
-    // You likely have a more complex version of this.
-    // The key is to call setIsLpActive based on the result.
-    const fetchLpTokenDetails = useCallback(async () => {
-        if (!tokenAddress || !publicKey) {
-            setIsLpActive(false);
-            return;
-        }
-
-        console.log(`[DEBUG] Starting LP check for token: ${tokenAddress}`);
-        try {
-            const cluster = network === 'devnet' ? 'devnet' : 'mainnet';
-            const pools = await fetchRaydiumPoolsFromSDK(connection, tokenAddress, cluster, publicKey);
-            if (pools && pools.length > 0) {
-                console.log("[DEBUG] LP was found, updating context.");
-                setIsLpActive(true);
-            } else {
-                console.log("[DEBUG] LP not found.");
-                setIsLpActive(false);
-            }
-        } catch (error) {
-            console.error("Failed to fetch LP details", error);
-            setIsLpActive(false);
-        }
-
-     }, [tokenAddress, publicKey, connection, network, setIsLpActive]);
-
- // Run the check whenever the token or wallet changes
-    useEffect(() => {
-        fetchLpTokenDetails();
-    }, [fetchLpTokenDetails]);
+     // Guard against undefined entries when switching networks
+    const currentBots = allBotsByNetwork[network] || [];
 
     // --- Other handlers ---
     const addLog = (message: string) => {

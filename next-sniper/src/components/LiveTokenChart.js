@@ -158,7 +158,7 @@ export default function LiveTokenChart({
 
     const startTrackingRef = useRef(startTracking);
     const stopTrackingRef = useRef(stopTracking);
-    const lastConfigRef = useRef({ mint: '', connection: null, pool: null });
+    const lastConfigRef = useRef({ mint: '', pool: null });
     const lastBrushInteractionRef = useRef(0);
     const prevDataLenRef = useRef(0);
 
@@ -194,25 +194,23 @@ export default function LiveTokenChart({
     useEffect(() => {
         if (!hasMounted) return;
         const sameMint = lastConfigRef.current.mint === tokenMint;
-        const sameConn = lastConfigRef.current.connection === connection;
-        const samePool = JSON.stringify(lastConfigRef.current.pool) === JSON.stringify(selectedPool);
-        if (tokenMint && tokenDecimals !== undefined && tokenDecimals !== null) {
-            if (!sameMint || !sameConn || !samePool) {
-                // Do not clear existing data when remounting with the same
-                // configuration. Simply resume tracking so the accumulated
-                // history in ChartDataContext continues to be used.
+        const samePoolId = lastConfigRef.current.pool?.id === selectedPool?.id;
+
+        if (tokenMint && tokenDecimals != null) {
+            if (!sameMint || !samePoolId) {
+                // Do not reset data unnecessarily when the connection object changes
                 lastBrushInteractionRef.current = Date.now();
+                lastConfigRef.current = { mint: tokenMint, pool: selectedPool };
                 startTrackingRef.current(tokenMint, connection, tokenDecimals, tokenSupply, selectedPool);
-                lastConfigRef.current = { mint: tokenMint, connection, pool: selectedPool };
             }
         } else {
             setOhlcData([]);
             setCurrentCandle(null);
             prevDataLenRef.current = 0;
             stopTrackingRef.current();
-            lastConfigRef.current = { mint: '', connection: null, pool: null };
+            lastConfigRef.current = { mint: '', pool: null };
         }
-    }, [hasMounted, tokenMint, tokenDecimals, connection, tokenSupply, selectedPool]);
+    }, [hasMounted, tokenMint, tokenDecimals, tokenSupply, selectedPool]);
 
     // Do not stop tracking on unmount so data continues accumulating even when
     // the chart component is not visible. Tracking will stop when the token
