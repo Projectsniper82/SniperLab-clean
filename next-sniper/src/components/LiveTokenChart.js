@@ -217,7 +217,8 @@ export default function LiveTokenChart({
     // itself is cleared via the dependency effect above.
 
     useEffect(() => {
-         if (!hasMounted) return;
+        if (!hasMounted) return;
+        if (rawPriceHistory.length === 0) return;
         console.log(`LiveTokenChart: Interval changed to ${selectedCandleIntervalMs / 1000}s. Re-aggregating.`);
         const maxCandles = Math.min(
             MAX_DISPLAY_POINTS,
@@ -225,7 +226,28 @@ export default function LiveTokenChart({
             Math.floor((MAX_RAW_TICKS * POLLING_INTERVAL_MS) / selectedCandleIntervalMs)
         );
         const historicalCandles = aggregateHistoricalCandles(rawPriceHistory, selectedCandleIntervalMs, maxCandles);
-        setOhlcData(historicalCandles);
+        setOhlcData(prev => {
+            const isSame =
+                prev.length === historicalCandles.length &&
+                prev.every((c, i) => {
+                    const next = historicalCandles[i];
+                    return (
+                        c &&
+                        next &&
+                        c.timestamp === next.timestamp &&
+                        c.open === next.open &&
+                        c.close === next.close &&
+                        c.high === next.high &&
+                        c.low === next.low
+                    );
+                });
+            if (isSame) {
+                console.log('[LiveTokenChart] Candles unchanged, no update.');
+                return prev;
+            }
+            console.log('[LiveTokenChart] Candles changed, updating.');
+            return historicalCandles;
+        });
         setCurrentCandle(null);
         
        const newWindow = computeWindow(historicalCandles.length);
