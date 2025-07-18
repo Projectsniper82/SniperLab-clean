@@ -57,6 +57,7 @@ export const ChartDataProvider = ({ children }: { children: React.ReactNode }) =
   const decimalsRef = useRef<number>(0);
   const supplyRef = useRef<string>('0');
   const connectionRef = useRef<Connection | null>(null);
+  const lastTrackedRpcUrlRef = useRef<string>('');
   const selectedPoolRef = useRef<{ vaultA?: string; vaultB?: string } | undefined>(undefined);
   const lastTrackedPoolRef = useRef<{ vaultA?: string; vaultB?: string } | undefined>(undefined);
   const vaultKeysRef = useRef<VaultKeys | null>(null);
@@ -65,7 +66,6 @@ export const ChartDataProvider = ({ children }: { children: React.ReactNode }) =
   const isInitialLoadingRef = useRef(false);
   const lastPriceRef = useRef(0);
   const lastTrackedMintRef = useRef<string>('');
-  const lastTrackedConnectionRef = useRef<Connection | null>(null);
 
   const resetState = () => {
     setRawPriceHistory([]);
@@ -200,11 +200,20 @@ export const ChartDataProvider = ({ children }: { children: React.ReactNode }) =
       pool?: { vaultA?: string; vaultB?: string }
     ) => {
       const isNewToken = lastTrackedMintRef.current !== mint;
-      const isNewConnection = lastTrackedConnectionRef.current !== connection;
+      const currentRpcUrl = connection.rpcEndpoint;
+      const isNewConnection = lastTrackedRpcUrlRef.current !== currentRpcUrl;
       const poolToUse = pool ?? lastTrackedPoolRef.current;
       const poolChanged =
         pool !== undefined &&
         JSON.stringify(lastTrackedPoolRef.current) !== JSON.stringify(pool);
+
+         if (process.env.NODE_ENV !== 'production') {
+        console.log(
+          `ChartDataProvider.startTracking mint=${mint} rpcUrl=${currentRpcUrl} pool=${JSON.stringify(
+            poolToUse
+          )} ticks=${rawPriceHistory.length}`
+        );
+      }
 
       tokenMintRef.current = mint;
       decimalsRef.current = decimals;
@@ -227,7 +236,7 @@ export const ChartDataProvider = ({ children }: { children: React.ReactNode }) =
       }
       fetchReserves();
       lastTrackedMintRef.current = mint;
-      lastTrackedConnectionRef.current = connection;
+      lastTrackedRpcUrlRef.current = currentRpcUrl;
       lastTrackedPoolRef.current = poolToUse;
     },
     [deriveVaultKeys, fetchReserves, fetchSolPrice]
@@ -246,6 +255,7 @@ export const ChartDataProvider = ({ children }: { children: React.ReactNode }) =
     connectionRef.current = null;
     tokenMintRef.current = '';
     lastTrackedPoolRef.current = undefined;
+    lastTrackedRpcUrlRef.current = '';
   }, []);
 
   useEffect(() => {
